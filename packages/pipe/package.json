@@ -1,0 +1,12 @@
+{
+  "name": "@ape/pipe",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "feedback-pipe": "src/server.js"
+  },
+  "dependencies": {
+    "@ape/shared": "*"
+  }
+}

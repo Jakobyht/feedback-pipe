@@ -1,0 +1,17 @@
+{
+  "name": "feedback-pipe",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A local pipe that forwards user feedback to the entity's own coding agent. No model, no judgement — just the wire.",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "pipe": "node packages/pipe/src/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
