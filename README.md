@@ -1,8 +1,8 @@
 # Feedback Pipe
 
 A single local program that forwards user feedback to an entity's **own** coding
-agent (e.g. Codex). It has no model and makes no judgement about the code — it is
-the wire, not the worker.
+agent (e.g. Claude Code). It has no model and makes no judgement about the code —
+it is the wire, not the worker.
 
 ```
 feedback (HTTP, authenticated)  ->  pipe  ->  spawns the entity's agent in the repo
@@ -31,7 +31,7 @@ npm install
 PIPE_API_KEY="acme-secret-key" \
 PIPE_REPO="/path/to/their/repo" \
 PIPE_WORKSPACE="acme" \
-PIPE_AGENT_COMMAND='codex exec "$(cat $APE_TASK_PROMPT_FILE)"' \
+PIPE_AGENT_COMMAND='claude -p "$(cat "$APE_TASK_PROMPT_FILE")" --permission-mode acceptEdits' \
 npm run pipe
 ```
 
@@ -56,7 +56,7 @@ curl -sS http://localhost:8181/tasks/<taskId> -H 'authorization: Bearer acme-sec
 |---|---|---|
 | `PIPE_API_KEY` | yes | Inbound key this entity authenticates with |
 | `PIPE_REPO` | yes | Repository the agent works on |
-| `PIPE_AGENT_COMMAND` | yes | The entity's agent. Gets `APE_TASK_PROMPT_FILE`, `APE_TASK_FILE`, `APE_TASK_ID`, `APE_REPO_PATH` |
+| `PIPE_AGENT_COMMAND` | yes | The entity's agent (e.g. Claude Code). Gets `APE_TASK_PROMPT_FILE`, `APE_TASK_FILE`, `APE_TASK_ID`, `APE_REPO_PATH` |
 | `PIPE_PORT` | no | Listen port (default 8181) |
 | `PIPE_WORKSPACE` | no | Label attached to tasks (default "default") |
 

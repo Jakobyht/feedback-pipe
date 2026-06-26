@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The pipe: one local program. It listens for feedback, forwards the user's
-// words verbatim to the entity's own agent (e.g. codex), and reports status.
+// words verbatim to the entity's own agent (e.g. Claude Code), and reports status.
 // It has no model and makes no judgement about the code.
 import http from "node:http";
 import fs from "node:fs/promises";
@@ -18,7 +18,7 @@ const workspaceId = process.env.PIPE_WORKSPACE || "default";
 
 if (!apiKey) fail("Missing PIPE_API_KEY (the inbound key this entity uses).");
 if (!repoPath) fail("Missing PIPE_REPO (the repository the agent works on).");
-if (!agentCommand) fail("Missing PIPE_AGENT_COMMAND (the entity's own agent, e.g. codex).");
+if (!agentCommand) fail("Missing PIPE_AGENT_COMMAND (the entity's own agent, e.g. Claude Code).");
 
 const tasks = new Map();
 
