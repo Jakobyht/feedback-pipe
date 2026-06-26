@@ -36,8 +36,10 @@ The pipe forwards the user's words verbatim. It does not assign priority, invent
 acceptance criteria, or rewrite the feedback. The agent makes every decision
 about the code.
 
-## Status lifecycle
+## One direction only
 
-`received` → `agent_started` → `agent_complete` (or `failed`).
-
-Status is queryable at `GET /tasks/<id>` with the inbound key.
+The pipe is fire-and-forget. It hands the feedback to the agent and is done — it
+does not wait for the agent, track whether it succeeded, or report anything back.
+The feedback sender does not care about the result, so there is no return path.
+`POST /feedback` responds `202 { taskId, status: "forwarded" }` the moment the
+agent has been launched.

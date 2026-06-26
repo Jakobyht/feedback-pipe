@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// The pipe: one local program. It listens for feedback, forwards the user's
-// words verbatim to the entity's own agent (e.g. Claude Code), and reports status.
-// It has no model and makes no judgement about the code.
+// The pipe: one local program, one direction. It receives feedback and hands
+// the user's words verbatim to the entity's own agent (e.g. Claude Code), then
+// it is done. It does not wait for the agent, track it, or report back — the
+// feedback sender does not care about the result. It is the wire, not the worker.
 import http from "node:http";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -20,21 +21,11 @@ if (!apiKey) fail("Missing PIPE_API_KEY (the inbound key this entity uses).");
 if (!repoPath) fail("Missing PIPE_REPO (the repository the agent works on).");
 if (!agentCommand) fail("Missing PIPE_AGENT_COMMAND (the entity's own agent, e.g. Claude Code).");
 
-const tasks = new Map();
-
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   if (req.method === "GET" && url.pathname === "/health") {
     return sendJson(res, 200, { ok: true, repo: repoPath, workspace: workspaceId });
-  }
-
-  if (req.method === "GET" && url.pathname.startsWith("/tasks/")) {
-    if (!authorized(req)) return sendJson(res, 401, { error: "unauthorized" });
-    const id = url.pathname.slice("/tasks/".length);
-    const record = tasks.get(id);
-    if (!record) return sendJson(res, 404, { error: "not_found" });
-    return sendJson(res, 200, record);
   }
 
   if (req.method === "POST" && url.pathname === "/feedback") {
@@ -59,11 +50,9 @@ const server = http.createServer(async (req, res) => {
     const validation = validateTask(task);
     if (!validation.ok) return sendJson(res, 422, { errors: validation.errors });
 
-    tasks.set(task.id, { task, status: "received", updates: [] });
-    // Hand off to the agent without blocking the response.
-    runAgent(task).catch((error) => setStatus(task.id, "failed", error.message));
-
-    return sendJson(res, 202, { taskId: task.id, status: "received" });
+    await forwardToAgent(task);
+    // The pipe's job ends here. It does not look back.
+    return sendJson(res, 202, { taskId: task.id, status: "forwarded" });
   }
 
   sendJson(res, 404, { error: "not_found" });
@@ -76,49 +65,31 @@ server.listen(port, host, () => {
   console.log("POST /feedback with Authorization: Bearer <PIPE_API_KEY>");
 });
 
-async function runAgent(task) {
+async function forwardToAgent(task) {
   const taskDir = path.join(repoPath, ".ape", "tasks", task.id);
   await fs.mkdir(taskDir, { recursive: true });
-  const taskFile = path.join(taskDir, "task.json");
+  await fs.writeFile(path.join(taskDir, "task.json"), JSON.stringify(task, null, 2));
   const promptFile = path.join(taskDir, "task.md");
-  await fs.writeFile(taskFile, JSON.stringify(task, null, 2));
   await fs.writeFile(promptFile, buildAgentPrompt(task));
-  setStatus(task.id, "agent_started", "Handed feedback to the agent");
 
-  await runShell(agentCommand, {
+  // Fire and forget: launch the agent and detach. We do not await it,
+  // track its exit, or read its output.
+  const child = spawn(agentCommand, {
     cwd: repoPath,
+    shell: true,
+    detached: true,
+    stdio: "ignore",
     env: {
-      APE_TASK_FILE: taskFile,
+      ...process.env,
+      APE_TASK_FILE: path.join(taskDir, "task.json"),
       APE_TASK_PROMPT_FILE: promptFile,
       APE_TASK_ID: task.id,
       APE_REPO_PATH: repoPath
     }
   });
-
-  setStatus(task.id, "agent_complete", "Agent finished");
-}
-
-function setStatus(taskId, status, detail) {
-  const record = tasks.get(taskId);
-  if (!record) return;
-  record.status = status;
-  record.updates.push({ status, detail: detail || null, at: new Date().toISOString() });
-  console.log(`[${taskId}] ${status}${detail ? ` — ${detail}` : ""}`);
-}
-
-function runShell(command, options = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, {
-      cwd: options.cwd,
-      shell: true,
-      stdio: "inherit",
-      env: { ...process.env, ...(options.env || {}) }
-    });
-    child.on("exit", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`Agent command exited with ${code}`));
-    });
-  });
+  child.on("error", (error) => console.error(`[${task.id}] failed to launch agent: ${error.message}`));
+  child.unref();
+  console.log(`[${task.id}] forwarded to agent`);
 }
 
 function authorized(req) {

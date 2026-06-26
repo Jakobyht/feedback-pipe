@@ -44,11 +44,10 @@ curl -sS http://localhost:8181/feedback \
   -d '{"message":"The checkout button does nothing on mobile","pageUrl":"/cart"}'
 ```
 
-The pipe responds `202 { taskId }`, then runs the agent. Poll status:
-
-```bash
-curl -sS http://localhost:8181/tasks/<taskId> -H 'authorization: Bearer acme-secret-key'
-```
+The pipe responds `202 { taskId, status: "forwarded" }` the moment it launches
+the agent, and then it is done. It is a one-way pipe: it does not wait for the
+agent, track it, or report the result back. What the agent does next (edit code,
+open a PR, etc.) is entirely the agent's concern.
 
 ## Environment variables
 
