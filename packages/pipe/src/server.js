@@ -14,12 +14,15 @@ const port = Number(process.env.PIPE_PORT || 8181);
 const host = process.env.PIPE_HOST || "127.0.0.1";
 const apiKey = process.env.PIPE_API_KEY;
 const repoPath = process.env.PIPE_REPO ? path.resolve(process.env.PIPE_REPO) : null;
-const agentCommand = process.env.PIPE_AGENT_COMMAND;
+// Defaults to Claude Code in headless mode. Override PIPE_AGENT_COMMAND to use
+// a different agent.
+const agentCommand =
+  process.env.PIPE_AGENT_COMMAND ||
+  'claude -p "$(cat "$APE_TASK_PROMPT_FILE")" --permission-mode acceptEdits';
 const workspaceId = process.env.PIPE_WORKSPACE || "default";
 
 if (!apiKey) fail("Missing PIPE_API_KEY (the inbound key this entity uses).");
 if (!repoPath) fail("Missing PIPE_REPO (the repository the agent works on).");
-if (!agentCommand) fail("Missing PIPE_AGENT_COMMAND (the entity's own agent, e.g. Claude Code).");
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);

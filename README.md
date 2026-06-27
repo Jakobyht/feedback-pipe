@@ -27,19 +27,19 @@ feedback (HTTP, authenticated)  ->  pipe  ->  spawns the entity's agent in the r
 
 ```bash
 npm install
-
-PIPE_API_KEY="acme-secret-key" \
-PIPE_REPO="/path/to/their/repo" \
-PIPE_WORKSPACE="acme" \
-PIPE_AGENT_COMMAND='claude -p "$(cat "$APE_TASK_PROMPT_FILE")" --permission-mode acceptEdits' \
+cp .env.example .env      # set PIPE_API_KEY and PIPE_REPO
 npm run pipe
 ```
+
+`npm run pipe` loads `.env` automatically. The agent defaults to Claude Code, so
+you usually only need to set `PIPE_API_KEY` and `PIPE_REPO`. (You can still pass
+any of these inline as environment variables instead of using `.env`.)
 
 Submit feedback:
 
 ```bash
 curl -sS http://localhost:8181/feedback \
-  -H 'authorization: Bearer acme-secret-key' \
+  -H 'authorization: Bearer <your PIPE_API_KEY>' \
   -H 'content-type: application/json' \
   -d '{"message":"The checkout button does nothing on mobile","pageUrl":"/cart"}'
 ```
