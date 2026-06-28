@@ -59,6 +59,19 @@
   .tab.active{color:#06210f;background:var(--accent);border-color:var(--accent);font-weight:600}
   .note{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--accent2);
     border-radius:8px;padding:12px 14px;color:var(--muted);font-size:14px;margin:14px 0}
+  .note.here{border-left-color:var(--accent)}
+  .flow{display:flex;flex-direction:column;margin-top:10px}
+  .step{display:flex;gap:16px;padding:18px 0;border-bottom:1px solid var(--line)}
+  .step:last-child{border-bottom:0}
+  .step .badge{flex:0 0 34px;height:34px;width:34px;border-radius:50%;display:grid;place-items:center;
+    background:var(--panel);border:1px solid var(--line);color:var(--accent);font-weight:700;font-size:15px}
+  .step h3{margin:0 0 4px;font-size:17px}
+  .step p{margin:0;color:var(--muted);font-size:14.5px}
+  .step.you{background:linear-gradient(90deg,rgba(74,222,128,.08),transparent);
+    border-radius:12px;padding:16px 14px;border-bottom:0;margin:4px 0}
+  .step.you .badge{background:var(--accent);color:#06210f;border-color:var(--accent)}
+  .hereTag{display:inline-block;font-size:12px;color:var(--accent);border:1px solid var(--accent);
+    border-radius:999px;padding:2px 9px;vertical-align:middle;font-weight:600;white-space:nowrap;margin-left:8px}
   footer{padding:40px 0 70px;color:var(--muted);text-align:center;border-top:1px solid var(--line)}
   @media(max-width:680px){.grid3{grid-template-columns:1fr}}
 </style>
@@ -82,12 +95,30 @@
 <main class="wrap">
 
   <section id="how">
-    <h2>How it works</h2>
-    <p class="lead">Three primitives: a socket to receive, a file to hand off, a process to run your agent.</p>
-    <div class="grid3">
-      <div class="card"><h3>1 · Receive</h3><p>Your app POSTs a feedback message to the pipe, authenticated with your key.</p></div>
-      <div class="card"><h3>2 · Forward</h3><p>The pipe writes the user's words verbatim into a prompt file in your repo.</p></div>
-      <div class="card"><h3>3 · Hand off</h3><p>It launches your agent on the repo and is done. One direction, no waiting.</p></div>
+    <h2>The exact process</h2>
+    <p class="lead">Everything that happens, end to end — and the one spot where your code fits.</p>
+    <div class="flow">
+      <div class="step">
+        <span class="badge">1</span>
+        <div><h3>A user sends feedback in <em>your</em> app</h3>
+        <p>They type into the feedback form, widget, or support box you already have. Nothing changes for them.</p></div>
+      </div>
+      <div class="step you">
+        <span class="badge">2</span>
+        <div><h3>Your app calls the pipe <span class="hereTag">← your code goes here</span></h3>
+        <p>Inside the handler that already runs when feedback is submitted, you add <strong>one</strong> HTTP POST to
+        the pipe, carrying your key. That single call is the only code you write. (See the snippet for your language below.)</p></div>
+      </div>
+      <div class="step">
+        <span class="badge">3</span>
+        <div><h3>The pipe forwards it</h3>
+        <p>It writes the user's words verbatim into a prompt file in your repo and launches your agent there.</p></div>
+      </div>
+      <div class="step">
+        <span class="badge">4</span>
+        <div><h3>Your agent fixes the code</h3>
+        <p>Claude Code (or Codex / Aider) reads the feedback and edits the repo. The pipe does not wait or report back.</p></div>
+      </div>
     </div>
   </section>
 
@@ -116,19 +147,29 @@ npm install</pre></div>
   </section>
 
   <section id="api">
-    <h2>The API</h2>
+    <h2>The API — and how to test it</h2>
     <p class="lead">One endpoint. POST your key and a JSON body — only <code class="inl">message</code> is required.</p>
     <div class="code"><button class="copy">Copy</button><pre>POST http://&lt;host&gt;:8181/feedback
 Authorization: Bearer &lt;PIPE_API_KEY&gt;
 Content-Type: application/json
 
 { "message": "The checkout button does nothing on mobile", "pageUrl": "/cart" }</pre></div>
-    <p class="lead" style="margin:0">Responds <code class="inl">202 { "taskId": "...", "status": "forwarded" }</code>. The pipe does not wait for the agent or report back.</p>
+    <p class="lead">Responds <code class="inl">202 { "taskId": "...", "status": "forwarded" }</code>. The pipe does not wait for the agent or report back.</p>
+    <div class="note"><strong>Test it first with curl.</strong> Run this in a terminal to confirm the pipe works
+      before touching your app. This <code class="inl">curl</code> is <em>only</em> a test — you do not put it in your code.</div>
+    <div class="code"><button class="copy">Copy</button><pre>curl -sS http://localhost:8181/feedback \
+  -H "authorization: Bearer YOUR_PIPE_API_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"message":"The checkout button does nothing on mobile","pageUrl":"/cart"}'</pre></div>
   </section>
 
   <section id="integrate">
-    <h2>Send feedback from your code</h2>
-    <p class="lead">Wherever a feedback message arrives in your app, make this one HTTP call.</p>
+    <h2>Where this goes in your app</h2>
+    <p class="lead">Once curl works, drop the same call into your real code.</p>
+    <div class="note here"><strong>Where exactly?</strong> Find the function in your app that <em>already</em> runs when a
+      user submits feedback — your form handler, your <code class="inl">/feedback</code> route, your support endpoint.
+      Right where you save or log that message, add the call below. That is the whole integration: one request, in a place
+      that already exists.</div>
     <div class="note"><strong>Keep the key safe:</strong> call the pipe from your <em>backend</em> so
       <code class="inl">PIPE_API_KEY</code> stays server-side. From a browser, the key is visible to users —
       front the pipe with your own server instead.</div>
