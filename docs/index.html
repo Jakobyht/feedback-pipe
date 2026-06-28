@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Feedback Pipe — the wire, not the worker</title>
+<meta name="description" content="A tiny local pipe that forwards user feedback straight to your own coding agent (Claude Code, Codex, Aider). No model, no judgement — just the wire." />
+<style>
+  :root{
+    --bg:#0b0f17; --panel:#121826; --panel2:#0e1420; --line:#1f2a3a;
+    --text:#e6edf3; --muted:#90a0b5; --accent:#4ade80; --accent2:#22d3ee;
+    --code:#0a0e16;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  a{color:var(--accent2);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:920px;margin:0 auto;padding:0 20px}
+  header.hero{padding:80px 20px 50px;text-align:center;
+    background:radial-gradient(1200px 400px at 50% -50px,rgba(74,222,128,.10),transparent);}
+  .pill{display:inline-block;font-size:13px;color:var(--accent);
+    border:1px solid var(--line);border-radius:999px;padding:5px 12px;margin-bottom:22px;
+    background:var(--panel)}
+  h1{font-size:clamp(34px,6vw,56px);line-height:1.08;margin:0 0 14px;letter-spacing:-.02em}
+  h1 .grad{background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-size:clamp(17px,2.4vw,21px);color:var(--muted);max-width:680px;margin:0 auto 30px}
+  .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-block;padding:12px 20px;border-radius:10px;font-weight:600;font-size:15px}
+  .btn.primary{background:var(--accent);color:#06210f}
+  .btn.ghost{border:1px solid var(--line);color:var(--text);background:var(--panel)}
+  section{padding:46px 0;border-top:1px solid var(--line)}
+  h2{font-size:26px;margin:0 0 6px;letter-spacing:-.01em}
+  h2 .n{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:10px}
+  .lead{color:var(--muted);margin:0 0 22px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .card h3{margin:0 0 6px;font-size:16px}
+  .card p{margin:0;color:var(--muted);font-size:14px}
+  .code{position:relative;background:var(--code);border:1px solid var(--line);
+    border-radius:12px;margin:14px 0}
+  .code pre{margin:0;padding:18px 16px;overflow:auto;font-size:13.5px;
+    font-family:"SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#d6e2f0}
+  .code .copy{position:absolute;top:9px;right:9px;border:1px solid var(--line);
+    background:var(--panel);color:var(--muted);border-radius:8px;padding:5px 10px;
+    font-size:12px;cursor:pointer;transition:.15s}
+  .code .copy:hover{color:var(--text);border-color:var(--accent)}
+  .code .copy.ok{color:var(--accent);border-color:var(--accent)}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:14px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600}
+  code.inl{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    padding:1px 6px;font-size:13px;font-family:ui-monospace,Menlo,monospace}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+  .tab{padding:7px 13px;border:1px solid var(--line);background:var(--panel);
+    color:var(--muted);border-radius:8px;cursor:pointer;font-size:13.5px}
+  .tab.active{color:#06210f;background:var(--accent);border-color:var(--accent);font-weight:600}
+  .note{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--accent2);
+    border-radius:8px;padding:12px 14px;color:var(--muted);font-size:14px;margin:14px 0}
+  footer{padding:40px 0 70px;color:var(--muted);text-align:center;border-top:1px solid var(--line)}
+  @media(max-width:680px){.grid3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="pill">● the wire, not the worker</span>
+    <h1>Feedback Pipe<br><span class="grad">user feedback → your agent</span></h1>
+    <p class="sub">A tiny local program that forwards a user's feedback straight to your own
+      coding agent — Claude Code, Codex, Aider, anything. No model, no judgement. It just
+      carries the message and gets out of the way.</p>
+    <div class="cta">
+      <a class="btn primary" href="#quickstart">Quick start</a>
+      <a class="btn ghost" href="https://github.com/Jakobyht/feedback-pipe" target="_blank" rel="noopener">View on GitHub ↗</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section id="how">
+    <h2>How it works</h2>
+    <p class="lead">Three primitives: a socket to receive, a file to hand off, a process to run your agent.</p>
+    <div class="grid3">
+      <div class="card"><h3>1 · Receive</h3><p>Your app POSTs a feedback message to the pipe, authenticated with your key.</p></div>
+      <div class="card"><h3>2 · Forward</h3><p>The pipe writes the user's words verbatim into a prompt file in your repo.</p></div>
+      <div class="card"><h3>3 · Hand off</h3><p>It launches your agent on the repo and is done. One direction, no waiting.</p></div>
+    </div>
+  </section>
+
+  <section id="quickstart">
+    <h2><span class="n">01</span>Install</h2>
+    <p class="lead">Requires Node.js 20+ and your agent installed (Claude Code by default).</p>
+    <div class="code"><button class="copy">Copy</button><pre>git clone https://github.com/Jakobyht/feedback-pipe.git
+cd feedback-pipe
+npm install</pre></div>
+
+    <h2 style="margin-top:34px"><span class="n">02</span>Configure</h2>
+    <p class="lead">Copy the template to <code class="inl">.env</code> (per-machine, never committed) and set two values.</p>
+    <div class="code"><button class="copy">Copy</button><pre>cp .env.example .env</pre></div>
+    <table>
+      <tr><th>Variable</th><th>Required</th><th>Meaning</th></tr>
+      <tr><td><code class="inl">PIPE_API_KEY</code></td><td>yes</td><td>Secret callers must send. Any string — use a long random one.</td></tr>
+      <tr><td><code class="inl">PIPE_REPO</code></td><td>yes</td><td>Absolute path to the repo the agent works on.</td></tr>
+      <tr><td><code class="inl">PIPE_AGENT_COMMAND</code></td><td>no</td><td>Agent to run. Defaults to Claude Code headless.</td></tr>
+      <tr><td><code class="inl">PIPE_PORT</code></td><td>no</td><td>Listen port (default 8181).</td></tr>
+      <tr><td><code class="inl">PIPE_HOST</code></td><td>no</td><td>Bind address (default 127.0.0.1; use 0.0.0.0 for remote calls).</td></tr>
+    </table>
+
+    <h2 style="margin-top:34px"><span class="n">03</span>Run</h2>
+    <p class="lead">That's the only command needed to keep it running.</p>
+    <div class="code"><button class="copy">Copy</button><pre>npm run pipe</pre></div>
+  </section>
+
+  <section id="api">
+    <h2>The API</h2>
+    <p class="lead">One endpoint. POST your key and a JSON body — only <code class="inl">message</code> is required.</p>
+    <div class="code"><button class="copy">Copy</button><pre>POST http://&lt;host&gt;:8181/feedback
+Authorization: Bearer &lt;PIPE_API_KEY&gt;
+Content-Type: application/json
+
+{ "message": "The checkout button does nothing on mobile", "pageUrl": "/cart" }</pre></div>
+    <p class="lead" style="margin:0">Responds <code class="inl">202 { "taskId": "...", "status": "forwarded" }</code>. The pipe does not wait for the agent or report back.</p>
+  </section>
+
+  <section id="integrate">
+    <h2>Send feedback from your code</h2>
+    <p class="lead">Wherever a feedback message arrives in your app, make this one HTTP call.</p>
+    <div class="note"><strong>Keep the key safe:</strong> call the pipe from your <em>backend</em> so
+      <code class="inl">PIPE_API_KEY</code> stays server-side. From a browser, the key is visible to users —
+      front the pipe with your own server instead.</div>
+
+    <div class="tabs" id="tabs"></div>
+    <div class="code"><button class="copy">Copy</button><pre id="snippet"></pre></div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Feedback Pipe — open source. <a href="https://github.com/Jakobyht/feedback-pipe" target="_blank" rel="noopener">github.com/Jakobyht/feedback-pipe</a></p>
+  </div>
+</footer>
+
+<script>
+// ---- copy buttons ----
+document.querySelectorAll('.code .copy').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var text = btn.parentElement.querySelector('pre').innerText;
+    navigator.clipboard.writeText(text).then(function(){
+      var old = btn.textContent; btn.textContent = 'Copied ✓'; btn.classList.add('ok');
+      setTimeout(function(){ btn.textContent = old; btn.classList.remove('ok'); }, 1400);
+    });
+  });
+});
+
+// ---- language snippets ----
+var snippets = {
+  "curl": `curl -sS http://localhost:8181/feedback \\
+  -H "authorization: Bearer $PIPE_API_KEY" \\
+  -H 'content-type: application/json' \\
+  -d '{"message":"The checkout button does nothing on mobile","pageUrl":"/cart"}'`,
+
+  "JavaScript": `// NOTE: exposes the key to users. Prefer routing through your backend.
+async function sendFeedback(message) {
+  await fetch("https://pipe.example.com/feedback", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: "Bearer YOUR_PIPE_API_KEY"
+    },
+    body: JSON.stringify({ message, pageUrl: location.pathname })
+  });
+}`,
+
+  "Node.js": `// Node 18+ has fetch built in.
+export async function sendFeedback(message, pageUrl) {
+  const res = await fetch("http://localhost:8181/feedback", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: \`Bearer \${process.env.PIPE_API_KEY}\`
+    },
+    body: JSON.stringify({ message, pageUrl })
+  });
+  if (!res.ok) throw new Error(\`pipe returned \${res.status}\`);
+}`,
+
+  "Python": `import os
+import requests
+
+def send_feedback(message, page_url=None):
+    requests.post(
+        "http://localhost:8181/feedback",
+        headers={"Authorization": f"Bearer {os.environ['PIPE_API_KEY']}"},
+        json={"message": message, "pageUrl": page_url},
+        timeout=5,
+    ).raise_for_status()`,
+
+  "Ruby": `require "net/http"
+require "json"
+
+def send_feedback(message, page_url = nil)
+  uri = URI("http://localhost:8181/feedback")
+  req = Net::HTTP::Post.new(uri,
+    "Content-Type" => "application/json",
+    "Authorization" => "Bearer #{ENV['PIPE_API_KEY']}")
+  req.body = { message: message, pageUrl: page_url }.to_json
+  Net::HTTP.start(uri.host, uri.port) { |http| http.request(req) }
+end`,
+
+  "PHP": `<?php
+function send_feedback(string $message, ?string $pageUrl = null): void {
+    $ch = curl_init("http://localhost:8181/feedback");
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => [
+            "Content-Type: application/json",
+            "Authorization: Bearer " . getenv("PIPE_API_KEY"),
+        ],
+        CURLOPT_POSTFIELDS => json_encode(["message" => $message, "pageUrl" => $pageUrl]),
+        CURLOPT_RETURNTRANSFER => true,
+    ]);
+    curl_exec($ch);
+    curl_close($ch);
+}`,
+
+  "Go": `package feedback
+
+import (
+\t"bytes"
+\t"encoding/json"
+\t"net/http"
+\t"os"
+)
+
+func Send(message, pageURL string) error {
+\tbody, _ := json.Marshal(map[string]string{"message": message, "pageUrl": pageURL})
+\treq, err := http.NewRequest("POST", "http://localhost:8181/feedback", bytes.NewReader(body))
+\tif err != nil {
+\t\treturn err
+\t}
+\treq.Header.Set("Content-Type", "application/json")
+\treq.Header.Set("Authorization", "Bearer "+os.Getenv("PIPE_API_KEY"))
+\tresp, err := http.DefaultClient.Do(req)
+\tif err != nil {
+\t\treturn err
+\t}
+\treturn resp.Body.Close()
+}`,
+
+  "Java": `import java.net.URI;
+import java.net.http.*;
+
+public class Feedback {
+    static final HttpClient CLIENT = HttpClient.newHttpClient();
+
+    public static void send(String message, String pageUrl) throws Exception {
+        String json = "{\\"message\\":" + quote(message) + ",\\"pageUrl\\":" + quote(pageUrl) + "}";
+        HttpRequest req = HttpRequest.newBuilder()
+            .uri(URI.create("http://localhost:8181/feedback"))
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer " + System.getenv("PIPE_API_KEY"))
+            .POST(HttpRequest.BodyPublishers.ofString(json))
+            .build();
+        CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private static String quote(String s) {
+        return s == null ? "null" : "\\"" + s.replace("\\"", "\\\\\\"") + "\\"";
+    }
+}`
+};
+
+var tabsEl = document.getElementById('tabs');
+var snippetEl = document.getElementById('snippet');
+Object.keys(snippets).forEach(function(lang, i){
+  var t = document.createElement('button');
+  t.className = 'tab' + (i===0?' active':'');
+  t.textContent = lang;
+  t.addEventListener('click', function(){
+    document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active')});
+    t.classList.add('active');
+    snippetEl.textContent = snippets[lang];
+  });
+  tabsEl.appendChild(t);
+});
+snippetEl.textContent = snippets[Object.keys(snippets)[0]];
+</script>
+</body>
+</html>

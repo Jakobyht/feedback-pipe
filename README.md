@@ -63,6 +63,11 @@ open a PR, etc.) is entirely the agent's concern.
 | `PIPE_PORT` | no | Listen port (default 8181) |
 | `PIPE_WORKSPACE` | no | Label attached to tasks (default "default") |
 
+## Integrate it
+
+To send feedback from your own app (snippets for JavaScript, Node, Python, Ruby,
+PHP, Go, Java, curl) see [docs/integration.md](docs/integration.md).
+
 ## Packages
 
 - `packages/pipe`: the local HTTP pipe.
