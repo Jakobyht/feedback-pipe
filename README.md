@@ -23,9 +23,13 @@ feedback (HTTP, authenticated)  ->  pipe  ->  spawns the entity's agent in the r
 2. **Model key** — the agent's own provider key (e.g. `OPENAI_API_KEY`). It lives
    only in the agent's environment. The pipe never sees it.
 
-## Run it
+## Download and run
+
+Requires Node 20+ and your coding agent (Claude Code by default).
 
 ```bash
+git clone https://github.com/Jakobyht/feedback-pipe.git
+cd feedback-pipe
 npm install
 cp .env.example .env      # set PIPE_API_KEY and PIPE_REPO
 npm run pipe
