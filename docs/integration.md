@@ -80,13 +80,19 @@ One endpoint. Send a `POST` with your key and a JSON body.
 
 ## 5. Send feedback from your code
 
-Wherever a feedback message arrives in your app, make this one HTTP call.
+**Where does this go?** Into the function your app *already* has for handling a
+submitted feedback message — your form handler, your `/feedback` route, your
+support endpoint. Right where you currently save or log that message, add one
+HTTP call to the pipe. That single request is the whole integration.
 
 > **Security:** prefer calling the pipe from your **backend**, so `PIPE_API_KEY`
 > stays on the server. If you call it from a browser, the key is visible to users
 > — in that case put your own server in front of the pipe.
 
-### Shell / curl
+### Shell / curl (for testing only)
+
+Run this in a terminal to confirm the pipe works before touching your app. You do
+**not** put `curl` in your code — use the language snippet below for that.
 
 ```bash
 curl -sS http://localhost:8181/feedback \
