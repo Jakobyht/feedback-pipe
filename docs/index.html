@@ -3,177 +3,297 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Feedback Pipe — the wire, not the worker</title>
-<meta name="description" content="A tiny local pipe that forwards user feedback straight to your own coding agent (Claude Code, Codex, Aider). No model, no judgement — just the wire." />
+<title>Feedback Agent — Setup Guide</title>
+<meta name="description" content="Step-by-step setup: turn app feedback into GitHub issues, then let a local coding agent fix them." />
 <style>
   :root{
-    --bg:#0b0f17; --panel:#121826; --panel2:#0e1420; --line:#1f2a3a;
-    --text:#e6edf3; --muted:#90a0b5; --accent:#4ade80; --accent2:#22d3ee;
-    --code:#0a0e16;
+    --bg:#f6f2ea; --paper:#fffdf9; --ink:#182a30; --muted:#5c6b74;
+    --line:#e3ddd1; --line2:#d3ccbe;
+    --accent:#0f766e; --accent-dark:#0b5850; --accent-soft:#e7f2ef;
+    --blue:#2563eb; --warn-bg:#fdf6e7; --warn-line:#e6c988; --warn-ink:#7a5312;
+    --code:#0f1720; --code-ink:#e8eef5; --code-line:#233042;
+    --shadow:0 12px 30px rgba(24,42,48,.08);
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
-  body{margin:0;background:var(--bg);color:var(--text);
-    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
-  a{color:var(--accent2);text-decoration:none}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  a{color:var(--blue);text-decoration:none}
   a:hover{text-decoration:underline}
-  .wrap{max-width:920px;margin:0 auto;padding:0 20px}
-  header.hero{padding:80px 20px 50px;text-align:center;
-    background:radial-gradient(1200px 400px at 50% -50px,rgba(74,222,128,.10),transparent);}
-  .pill{display:inline-block;font-size:13px;color:var(--accent);
-    border:1px solid var(--line);border-radius:999px;padding:5px 12px;margin-bottom:22px;
-    background:var(--panel)}
-  h1{font-size:clamp(34px,6vw,56px);line-height:1.08;margin:0 0 14px;letter-spacing:-.02em}
-  h1 .grad{background:linear-gradient(90deg,var(--accent),var(--accent2));
-    -webkit-background-clip:text;background-clip:text;color:transparent}
-  .sub{font-size:clamp(17px,2.4vw,21px);color:var(--muted);max-width:680px;margin:0 auto 30px}
-  .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-  .btn{display:inline-block;padding:12px 20px;border-radius:10px;font-weight:600;font-size:15px}
-  .btn.primary{background:var(--accent);color:#06210f}
-  .btn.ghost{border:1px solid var(--line);color:var(--text);background:var(--panel)}
-  section{padding:46px 0;border-top:1px solid var(--line)}
-  h2{font-size:26px;margin:0 0 6px;letter-spacing:-.01em}
-  h2 .n{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:10px}
-  .lead{color:var(--muted);margin:0 0 22px}
-  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
-  .card h3{margin:0 0 6px;font-size:16px}
-  .card p{margin:0;color:var(--muted);font-size:14px}
-  .code{position:relative;background:var(--code);border:1px solid var(--line);
-    border-radius:12px;margin:14px 0}
-  .code pre{margin:0;padding:18px 16px;overflow:auto;font-size:13.5px;
-    font-family:"SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#d6e2f0}
-  .code .copy{position:absolute;top:9px;right:9px;border:1px solid var(--line);
-    background:var(--panel);color:var(--muted);border-radius:8px;padding:5px 10px;
-    font-size:12px;cursor:pointer;transition:.15s}
-  .code .copy:hover{color:var(--text);border-color:var(--accent)}
-  .code .copy.ok{color:var(--accent);border-color:var(--accent)}
-  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:14px}
-  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-  th{color:var(--muted);font-weight:600}
-  code.inl{background:var(--panel);border:1px solid var(--line);border-radius:6px;
-    padding:1px 6px;font-size:13px;font-family:ui-monospace,Menlo,monospace}
-  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
-  .tab{padding:7px 13px;border:1px solid var(--line);background:var(--panel);
-    color:var(--muted);border-radius:8px;cursor:pointer;font-size:13.5px}
-  .tab.active{color:#06210f;background:var(--accent);border-color:var(--accent);font-weight:600}
-  .note{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--accent2);
-    border-radius:8px;padding:12px 14px;color:var(--muted);font-size:14px;margin:14px 0}
-  .note.here{border-left-color:var(--accent)}
-  .flow{display:flex;flex-direction:column;margin-top:10px}
-  .step{display:flex;gap:16px;padding:18px 0;border-bottom:1px solid var(--line)}
-  .step:last-child{border-bottom:0}
-  .step .badge{flex:0 0 34px;height:34px;width:34px;border-radius:50%;display:grid;place-items:center;
-    background:var(--panel);border:1px solid var(--line);color:var(--accent);font-weight:700;font-size:15px}
-  .step h3{margin:0 0 4px;font-size:17px}
-  .step p{margin:0;color:var(--muted);font-size:14.5px}
-  .step.you{background:linear-gradient(90deg,rgba(74,222,128,.08),transparent);
-    border-radius:12px;padding:16px 14px;border-bottom:0;margin:4px 0}
-  .step.you .badge{background:var(--accent);color:#06210f;border-color:var(--accent)}
-  .hereTag{display:inline-block;font-size:12px;color:var(--accent);border:1px solid var(--accent);
-    border-radius:999px;padding:2px 9px;vertical-align:middle;font-weight:600;white-space:nowrap;margin-left:8px}
-  footer{padding:40px 0 70px;color:var(--muted);text-align:center;border-top:1px solid var(--line)}
-  @media(max-width:680px){.grid3{grid-template-columns:1fr}}
+  .wrap{width:100%;max-width:940px;margin:0 auto;padding:0 22px}
+
+  /* top bar */
+  .top{position:sticky;top:0;z-index:20;background:rgba(246,242,234,.86);
+    backdrop-filter:saturate(1.2) blur(8px);border-bottom:1px solid var(--line)}
+  .top .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;gap:16px}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:800;color:var(--accent-dark)}
+  .brand .glyph{width:22px;height:22px;border-radius:6px;background:var(--accent);
+    display:inline-block;position:relative}
+  .brand .glyph:after{content:"";position:absolute;inset:6px 5px;border-left:3px solid #fff;border-radius:2px}
+  .navlinks{display:flex;gap:20px;font-size:14.5px;font-weight:600}
+  .navlinks a{color:var(--muted)}
+  .navlinks a:hover{color:var(--ink);text-decoration:none}
+
+  /* hero */
+  .hero{padding:64px 0 46px;
+    background:radial-gradient(900px 320px at 15% -40px,var(--accent-soft),transparent)}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--accent-soft);
+    border:1px solid #bfe0d9;color:var(--accent-dark);border-radius:999px;
+    padding:5px 13px;font-weight:700;font-size:13px}
+  h1{font-size:clamp(34px,5.4vw,56px);line-height:1.04;letter-spacing:-.02em;margin:18px 0 14px;max-width:16ch}
+  .sub{font-size:clamp(17px,2.2vw,21px);color:var(--muted);margin:0;max-width:60ch}
+  .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;min-height:46px;
+    padding:12px 20px;border-radius:10px;border:1px solid var(--line2);font-weight:700;font-size:15px}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:var(--shadow)}
+  .btn.primary:hover{background:var(--accent-dark);text-decoration:none}
+  .btn.ghost{background:var(--paper);color:var(--ink)}
+  .btn.ghost:hover{border-color:var(--accent);text-decoration:none}
+
+  /* flow diagram */
+  .flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:stretch;gap:10px;margin-top:14px}
+  .node{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 16px;box-shadow:var(--shadow)}
+  .node .k{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--accent)}
+  .node h4{margin:5px 0 3px;font-size:16px}
+  .node p{margin:0;color:var(--muted);font-size:13.5px}
+  .arrow{display:grid;place-items:center;color:var(--line2);font-size:22px;font-weight:900}
+
+  /* sections */
+  main section{padding:46px 0;border-top:1px solid var(--line)}
+  .tag{font-size:12.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--accent)}
+  h2{font-size:clamp(25px,3.2vw,33px);line-height:1.15;letter-spacing:-.01em;margin:6px 0 8px}
+  .lead{color:var(--muted);font-size:17.5px;margin:0 0 8px;max-width:66ch}
+
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .card b{display:block;margin-bottom:5px;color:var(--ink)}
+  .card p{margin:0;color:var(--muted);font-size:14.5px}
+
+  /* phase + steps */
+  .phase{display:flex;align-items:center;gap:10px;margin:30px 0 6px;font-weight:800;color:var(--accent-dark)}
+  .phase .pill{background:var(--accent);color:#fff;border-radius:999px;font-size:12px;font-weight:800;
+    padding:3px 10px;letter-spacing:.03em}
+  .steps{list-style:none;margin:0;padding:0;counter-reset:s}
+  .step{position:relative;background:var(--paper);border:1px solid var(--line);border-radius:14px;
+    padding:22px 22px 22px 70px;margin:14px 0;box-shadow:var(--shadow)}
+  .step:before{counter-increment:s;content:counter(s);position:absolute;left:18px;top:20px;
+    width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;
+    display:grid;place-items:center;font-weight:800;font-size:16px}
+  .step h3{margin:2px 0 8px;font-size:20px;line-height:1.25}
+  .step p{margin:0 0 6px;color:var(--muted)}
+  .where{display:inline-block;background:var(--accent-soft);border:1px solid #cbe4de;color:var(--accent-dark);
+    border-radius:7px;padding:2px 9px;font-size:13px;font-weight:700;margin:2px 0 8px}
+  .check{margin:12px 0 0;padding:0;list-style:none}
+  .check li{margin:7px 0;padding-left:26px;position:relative;font-size:14.5px;color:var(--ink)}
+  .check li:before{content:"✓";position:absolute;left:0;color:var(--accent);font-weight:900}
+
+  .fname{display:inline-block;background:#fff;border:1px solid var(--line2);border-radius:6px;
+    padding:1px 7px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9em;color:#0f172a}
+
+  /* code */
+  .code{position:relative;background:var(--code);border:1px solid var(--code-line);
+    border-radius:11px;margin:14px 0;overflow:hidden}
+  .code pre{margin:0;padding:16px 16px;overflow:auto;color:var(--code-ink);font-size:13.5px;line-height:1.6;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .copy{position:absolute;top:9px;right:9px;border:1px solid #38465b;background:#1b2534;color:#cdd7e4;
+    border-radius:7px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer}
+  .copy:hover{border-color:var(--accent)}
+  .copy.ok{background:#0b3d34;border-color:#10b981;color:#a7f3d0}
+
+  /* callouts */
+  .note{background:#eef5fb;border:1px solid #cfe0f2;border-left:4px solid var(--blue);
+    border-radius:10px;padding:13px 15px;margin:16px 0;color:#22384f;font-size:15px}
+  .note.here{background:var(--accent-soft);border-color:#cbe4de;border-left-color:var(--accent)}
+  .note.warn{background:var(--warn-bg);border-color:var(--warn-line);border-left-color:#c98b17;color:var(--warn-ink)}
+
+  /* tabs */
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 6px}
+  .tab{padding:8px 14px;border:1px solid var(--line2);background:var(--paper);border-radius:9px;cursor:pointer;
+    font-weight:700;color:var(--muted);font-size:14px}
+  .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  footer{border-top:1px solid var(--line);padding:34px 0 60px;color:var(--muted);text-align:center;font-size:14.5px}
+
+  @media(max-width:820px){
+    .cards{grid-template-columns:1fr}
+    .flow{grid-template-columns:1fr}
+    .arrow{transform:rotate(90deg);padding:2px 0}
+    .navlinks{display:none}
+  }
+  @media(max-width:520px){
+    .wrap{padding:0 16px}
+    h1{font-size:31px}
+    .step{padding:20px 16px 20px 16px}
+    .step:before{position:static;display:inline-grid;margin-bottom:10px}
+    .cta{display:grid;grid-template-columns:1fr}
+    .btn{width:100%}
+    p,li,h1,h2,h3{overflow-wrap:anywhere}
+  }
 </style>
 </head>
 <body>
 
+<div class="top">
+  <div class="wrap">
+    <span class="brand"><span class="glyph"></span> Feedback Agent</span>
+    <nav class="navlinks">
+      <a href="#how">How it works</a>
+      <a href="#setup">Setup</a>
+      <a href="#test">Test</a>
+      <a href="#app">Add to your app</a>
+    </nav>
+  </div>
+</div>
+
 <header class="hero">
   <div class="wrap">
-    <span class="pill">● the wire, not the worker</span>
-    <h1>Feedback Pipe<br><span class="grad">user feedback → your agent</span></h1>
-    <p class="sub">A tiny local program that forwards a user's feedback straight to your own
-      coding agent — Claude Code, Codex, Aider, anything. No model, no judgement. It just
-      carries the message and gets out of the way.</p>
+    <span class="eyebrow">● Step-by-step setup guide</span>
+    <h1>Turn app feedback into agent work.</h1>
+    <p class="sub">User feedback becomes a GitHub issue, and a small watcher on your own machine hands
+      that issue to your coding agent. You wire it up once — this page shows every step.</p>
     <div class="cta">
-      <a class="btn primary" href="#quickstart">Quick start</a>
-      <a class="btn ghost" href="https://github.com/Jakobyht/feedback-pipe" target="_blank" rel="noopener">View on GitHub ↗</a>
+      <a class="btn primary" href="#setup">Start the setup ↓</a>
+      <a class="btn ghost" href="https://github.com/Jakobyht/feedback-pipe" target="_blank" rel="noopener">GitHub project ↗</a>
     </div>
   </div>
 </header>
 
 <main class="wrap">
 
+  <!-- HOW IT WORKS -->
   <section id="how">
-    <h2>The exact process</h2>
-    <p class="lead">Everything that happens, end to end — and the one spot where your code fits.</p>
+    <span class="tag">How it works</span>
+    <h2>Three moving parts</h2>
+    <p class="lead">Your app only saves feedback. Supabase turns it into a GitHub issue. A watcher on your
+      machine sees the issue and starts the agent. GitHub in the middle keeps everything visible and reviewable.</p>
     <div class="flow">
-      <div class="step">
-        <span class="badge">1</span>
-        <div><h3>A user sends feedback in <em>your</em> app</h3>
-        <p>They type into the feedback form, widget, or support box you already have. Nothing changes for them.</p></div>
-      </div>
-      <div class="step you">
-        <span class="badge">2</span>
-        <div><h3>Your app calls the pipe <span class="hereTag">← your code goes here</span></h3>
-        <p>Inside the handler that already runs when feedback is submitted, you add <strong>one</strong> HTTP POST to
-        the pipe, carrying your key. That single call is the only code you write. (See the snippet for your language below.)</p></div>
-      </div>
-      <div class="step">
-        <span class="badge">3</span>
-        <div><h3>The pipe forwards it</h3>
-        <p>It writes the user's words verbatim into a prompt file in your repo and launches your agent there.</p></div>
-      </div>
-      <div class="step">
-        <span class="badge">4</span>
-        <div><h3>Your agent fixes the code</h3>
-        <p>Claude Code (or Codex / Aider) reads the feedback and edits the repo. The pipe does not wait or report back.</p></div>
-      </div>
+      <div class="node"><div class="k">Your app</div><h4>Saves feedback</h4><p>Inserts one row into a Supabase table.</p></div>
+      <div class="arrow">→</div>
+      <div class="node"><div class="k">Supabase → GitHub</div><h4>Creates an issue</h4><p>An Edge Function opens a labeled GitHub issue.</p></div>
+      <div class="arrow">→</div>
+      <div class="node"><div class="k">Your machine</div><h4>Runs the agent</h4><p>A watcher sees the issue and starts your agent.</p></div>
     </div>
   </section>
 
-  <section id="quickstart">
-    <h2><span class="n">01</span>Install</h2>
-    <p class="lead">Requires Node.js 20+ and your agent installed (Claude Code by default).</p>
-    <div class="code"><button class="copy">Copy</button><pre>git clone https://github.com/Jakobyht/feedback-pipe.git
-cd feedback-pipe
-npm install</pre></div>
-
-    <h2 style="margin-top:34px"><span class="n">02</span>Configure</h2>
-    <p class="lead">Copy the template to <code class="inl">.env</code> (per-machine, never committed) and set two values.</p>
-    <div class="code"><button class="copy">Copy</button><pre>cp .env.example .env</pre></div>
-    <table>
-      <tr><th>Variable</th><th>Required</th><th>Meaning</th></tr>
-      <tr><td><code class="inl">PIPE_API_KEY</code></td><td>yes</td><td>Secret callers must send. Any string — use a long random one.</td></tr>
-      <tr><td><code class="inl">PIPE_REPO</code></td><td>yes</td><td>Absolute path to the repo the agent works on.</td></tr>
-      <tr><td><code class="inl">PIPE_AGENT_COMMAND</code></td><td>no</td><td>Agent to run. Defaults to Claude Code headless.</td></tr>
-      <tr><td><code class="inl">PIPE_PORT</code></td><td>no</td><td>Listen port (default 8181).</td></tr>
-      <tr><td><code class="inl">PIPE_HOST</code></td><td>no</td><td>Bind address (default 127.0.0.1; use 0.0.0.0 for remote calls).</td></tr>
-    </table>
-
-    <h2 style="margin-top:34px"><span class="n">03</span>Run</h2>
-    <p class="lead">That's the only command needed to keep it running.</p>
-    <div class="code"><button class="copy">Copy</button><pre>npm run pipe</pre></div>
+  <!-- PREREQUISITES -->
+  <section id="before">
+    <span class="tag">Before you start</span>
+    <h2>What you need</h2>
+    <div class="cards">
+      <div class="card"><b>Supabase project</b><p>Hosts the feedback table, the webhook, and the Edge Function.</p></div>
+      <div class="card"><b>GitHub repo + token</b><p>Where issues are created. Token needs <em>Issues: read &amp; write</em>.</p></div>
+      <div class="card"><b>A machine to run the watcher</b><p>Your laptop or a Mac mini with Node.js 20+ and your coding agent installed.</p></div>
+    </div>
   </section>
 
-  <section id="api">
-    <h2>The API — and how to test it</h2>
-    <p class="lead">One endpoint. POST your key and a JSON body — only <code class="inl">message</code> is required.</p>
-    <div class="code"><button class="copy">Copy</button><pre>POST http://&lt;host&gt;:8181/feedback
-Authorization: Bearer &lt;PIPE_API_KEY&gt;
-Content-Type: application/json
+  <!-- SETUP -->
+  <section id="setup">
+    <span class="tag">The tutorial</span>
+    <h2>Step-by-step setup</h2>
+    <p class="lead">Do these in order. Steps 1–4 set up Supabase → GitHub. Step 5 is the one line your app adds.
+      Step 6 starts the watcher on your machine.</p>
 
-{ "message": "The checkout button does nothing on mobile", "pageUrl": "/cart" }</pre></div>
-    <p class="lead">Responds <code class="inl">202 { "taskId": "...", "status": "forwarded" }</code>. The pipe does not wait for the agent or report back.</p>
-    <div class="note"><strong>Test it first with curl.</strong> Run this in a terminal to confirm the pipe works
-      before touching your app. This <code class="inl">curl</code> is <em>only</em> a test — you do not put it in your code.</div>
-    <div class="code"><button class="copy">Copy</button><pre>curl -sS http://localhost:8181/feedback \
-  -H "authorization: Bearer YOUR_PIPE_API_KEY" \
-  -H 'content-type: application/json' \
-  -d '{"message":"The checkout button does nothing on mobile","pageUrl":"/cart"}'</pre></div>
+    <div class="phase"><span class="pill">Part 1</span> Supabase → GitHub issues</div>
+    <ol class="steps">
+      <li class="step">
+        <h3>Create the feedback table</h3>
+        <span class="where">Supabase → SQL Editor</span>
+        <p>Paste the SQL from <span class="fname">supabase/sql/feedback.sql</span> and click <strong>Run</strong>.
+          This creates the <span class="fname">feedback</span> table your app writes to.</p>
+      </li>
+
+      <li class="step">
+        <h3>Deploy the Edge Function</h3>
+        <span class="where">Terminal (Supabase CLI)</span>
+        <p>This function receives a new feedback row and creates the GitHub issue. Its code is in
+          <span class="fname">supabase/functions/create-github-issue/index.ts</span>.</p>
+        <div class="code"><button class="copy">Copy</button><pre>supabase functions deploy create-github-issue --no-verify-jwt</pre></div>
+      </li>
+
+      <li class="step">
+        <h3>Set the function's secrets</h3>
+        <span class="where">Terminal (Supabase CLI)</span>
+        <p>Give the function your GitHub details. Replace the values with your own.</p>
+        <div class="code"><button class="copy">Copy</button><pre>supabase secrets set GITHUB_OWNER="your-github-user-or-org"
+supabase secrets set GITHUB_REPO="your-repo-name"
+supabase secrets set GITHUB_TOKEN="your-github-token"
+supabase secrets set WEBHOOK_SECRET="make-a-long-random-secret"</pre></div>
+        <ul class="check">
+          <li>The GitHub token stays in Supabase — it never touches your app or browser.</li>
+          <li>New issues are labeled <span class="fname">user-feedback</span> and <span class="fname">agent-ready</span>.</li>
+        </ul>
+      </li>
+
+      <li class="step">
+        <h3>Connect the table to the function</h3>
+        <span class="where">Supabase → Database → Webhooks</span>
+        <p>Create a webhook so every new feedback row calls the function.</p>
+        <ul class="check">
+          <li>Table <span class="fname">feedback</span>, event <span class="fname">INSERT</span>, method <span class="fname">POST</span></li>
+          <li>URL <span class="fname">https://YOUR_PROJECT_REF.supabase.co/functions/v1/create-github-issue</span></li>
+          <li>Header <span class="fname">x-feedback-webhook-secret</span> = your <span class="fname">WEBHOOK_SECRET</span></li>
+        </ul>
+      </li>
+    </ol>
+
+    <div class="phase"><span class="pill">Part 2</span> Your app</div>
+    <ol class="steps" style="counter-reset:s 4">
+      <li class="step">
+        <h3>Save feedback from your app</h3>
+        <span class="where">Your feedback form handler</span>
+        <p>This is the <strong>only</strong> code your app adds. Put it where the user's feedback is submitted —
+          it just inserts a row. Supabase and GitHub do the rest.</p>
+        <div class="code"><button class="copy">Copy</button><pre>await supabase.from("feedback").insert({
+  message: feedbackMessage,
+  page_url: window.location.pathname,
+  user_email: user?.email ?? null
+});</pre></div>
+      </li>
+    </ol>
+
+    <div class="phase"><span class="pill">Part 3</span> Your machine</div>
+    <ol class="steps" style="counter-reset:s 5">
+      <li class="step">
+        <h3>Start the watcher</h3>
+        <span class="where">Terminal on your laptop / Mac mini</span>
+        <p>It polls GitHub for issues labeled <span class="fname">agent-ready</span> and starts your agent on the repo.
+          Leave the window open — closing it stops the watcher.</p>
+        <div class="code"><button class="copy">Copy</button><pre>GITHUB_OWNER="your-github-user-or-org" \
+GITHUB_REPO="your-repo-name" \
+GITHUB_TOKEN="your-github-token" \
+AGENT_REPO="/absolute/path/to/the/code/repo" \
+npm run github-agent</pre></div>
+        <p style="margin-top:10px;color:var(--muted);font-size:14.5px">The agent defaults to Claude Code. Override it
+          with <span class="fname">AGENT_COMMAND</span> to use Codex, Aider, or anything else.</p>
+      </li>
+    </ol>
   </section>
 
-  <section id="integrate">
-    <h2>Where this goes in your app</h2>
-    <p class="lead">Once curl works, drop the same call into your real code.</p>
-    <div class="note here"><strong>Where exactly?</strong> Find the function in your app that <em>already</em> runs when a
-      user submits feedback — your form handler, your <code class="inl">/feedback</code> route, your support endpoint.
-      Right where you save or log that message, add the call below. That is the whole integration: one request, in a place
-      that already exists.</div>
-    <div class="note"><strong>Keep the key safe:</strong> call the pipe from your <em>backend</em> so
-      <code class="inl">PIPE_API_KEY</code> stays server-side. From a browser, the key is visible to users —
-      front the pipe with your own server instead.</div>
+  <!-- TEST -->
+  <section id="test">
+    <span class="tag">Verify</span>
+    <h2>Test the whole flow</h2>
+    <p class="lead">Insert one feedback row. It should become a GitHub issue, and the watcher should start the agent.</p>
+    <div class="code"><button class="copy">Copy</button><pre>insert into public.feedback (message, page_url, user_email)
+values ('The checkout button does nothing on mobile', '/cart', 'test@example.com');</pre></div>
+    <div class="note here"><strong>Expected:</strong> a new GitHub issue labeled <span class="fname">agent-ready</span>
+      appears, and the watcher terminal shows it starting the agent.</div>
+    <div class="cards">
+      <div class="card"><b>No issue appears</b><p>Check the webhook URL, the secret header, and the token's Issues permission.</p></div>
+      <div class="card"><b>Issue but no agent</b><p>Confirm the issue has <span class="fname">agent-ready</span> and the watcher is running.</p></div>
+      <div class="card"><b>Runs only once</b><p>Intended — handled issues are remembered in <span class="fname">.ape/github-agent/processed.json</span>.</p></div>
+    </div>
+  </section>
 
+  <!-- ADD TO YOUR APP -->
+  <section id="app">
+    <span class="tag">Integration</span>
+    <h2>Add it to your app</h2>
+    <p class="lead">The whole app-side change is inserting one row into Supabase when feedback is submitted.
+      Pick the version closest to your stack.</p>
+    <div class="note warn"><strong>Never put the GitHub token in your app.</strong> It lives only in the Supabase
+      function's secrets. Your app talks to Supabase, nothing else.</div>
     <div class="tabs" id="tabs"></div>
     <div class="code"><button class="copy">Copy</button><pre id="snippet"></pre></div>
   </section>
@@ -182,152 +302,63 @@ Content-Type: application/json
 
 <footer>
   <div class="wrap">
-    <p>Feedback Pipe — open source. <a href="https://github.com/Jakobyht/feedback-pipe" target="_blank" rel="noopener">github.com/Jakobyht/feedback-pipe</a></p>
+    Feedback Agent — open source ·
+    <a href="https://github.com/Jakobyht/feedback-pipe" target="_blank" rel="noopener">github.com/Jakobyht/feedback-pipe</a>
   </div>
 </footer>
 
 <script>
-// ---- copy buttons ----
 document.querySelectorAll('.code .copy').forEach(function(btn){
   btn.addEventListener('click', function(){
     var text = btn.parentElement.querySelector('pre').innerText;
     navigator.clipboard.writeText(text).then(function(){
       var old = btn.textContent; btn.textContent = 'Copied ✓'; btn.classList.add('ok');
-      setTimeout(function(){ btn.textContent = old; btn.classList.remove('ok'); }, 1400);
+      setTimeout(function(){ btn.textContent = old; btn.classList.remove('ok'); }, 1300);
     });
   });
 });
 
-// ---- language snippets ----
 var snippets = {
-  "curl": `curl -sS http://localhost:8181/feedback \\
-  -H "authorization: Bearer $PIPE_API_KEY" \\
-  -H 'content-type: application/json' \\
-  -d '{"message":"The checkout button does nothing on mobile","pageUrl":"/cart"}'`,
-
-  "JavaScript": `// NOTE: exposes the key to users. Prefer routing through your backend.
-async function sendFeedback(message) {
-  await fetch("https://pipe.example.com/feedback", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: "Bearer YOUR_PIPE_API_KEY"
-    },
-    body: JSON.stringify({ message, pageUrl: location.pathname })
+  "Supabase (browser)": `async function sendFeedback(feedbackMessage, user) {
+  const { error } = await supabase.from("feedback").insert({
+    message: feedbackMessage,
+    page_url: window.location.pathname,
+    user_email: user?.email ?? null
   });
+  if (error) throw error;
 }`,
+  "Next.js (route)": `// app/api/feedback/route.ts
+import { createClient } from "@supabase/supabase-js";
 
-  "Node.js": `// Node 18+ has fetch built in.
-export async function sendFeedback(message, pageUrl) {
-  const res = await fetch("http://localhost:8181/feedback", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: \`Bearer \${process.env.PIPE_API_KEY}\`
-    },
-    body: JSON.stringify({ message, pageUrl })
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export async function POST(req: Request) {
+  const { message, pageUrl, userEmail } = await req.json();
+  const { error } = await supabase.from("feedback").insert({
+    message, page_url: pageUrl, user_email: userEmail ?? null
   });
-  if (!res.ok) throw new Error(\`pipe returned \${res.status}\`);
+  if (error) return Response.json({ error: error.message }, { status: 500 });
+  return Response.json({ ok: true });
 }`,
-
-  "Python": `import os
-import requests
-
-def send_feedback(message, page_url=None):
-    requests.post(
-        "http://localhost:8181/feedback",
-        headers={"Authorization": f"Bearer {os.environ['PIPE_API_KEY']}"},
-        json={"message": message, "pageUrl": page_url},
-        timeout=5,
-    ).raise_for_status()`,
-
-  "Ruby": `require "net/http"
-require "json"
-
-def send_feedback(message, page_url = nil)
-  uri = URI("http://localhost:8181/feedback")
-  req = Net::HTTP::Post.new(uri,
-    "Content-Type" => "application/json",
-    "Authorization" => "Bearer #{ENV['PIPE_API_KEY']}")
-  req.body = { message: message, pageUrl: page_url }.to_json
-  Net::HTTP.start(uri.host, uri.port) { |http| http.request(req) }
-end`,
-
-  "PHP": `<?php
-function send_feedback(string $message, ?string $pageUrl = null): void {
-    $ch = curl_init("http://localhost:8181/feedback");
-    curl_setopt_array($ch, [
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => [
-            "Content-Type: application/json",
-            "Authorization: Bearer " . getenv("PIPE_API_KEY"),
-        ],
-        CURLOPT_POSTFIELDS => json_encode(["message" => $message, "pageUrl" => $pageUrl]),
-        CURLOPT_RETURNTRANSFER => true,
-    ]);
-    curl_exec($ch);
-    curl_close($ch);
-}`,
-
-  "Go": `package feedback
-
-import (
-\t"bytes"
-\t"encoding/json"
-\t"net/http"
-\t"os"
-)
-
-func Send(message, pageURL string) error {
-\tbody, _ := json.Marshal(map[string]string{"message": message, "pageUrl": pageURL})
-\treq, err := http.NewRequest("POST", "http://localhost:8181/feedback", bytes.NewReader(body))
-\tif err != nil {
-\t\treturn err
-\t}
-\treq.Header.Set("Content-Type", "application/json")
-\treq.Header.Set("Authorization", "Bearer "+os.Getenv("PIPE_API_KEY"))
-\tresp, err := http.DefaultClient.Do(req)
-\tif err != nil {
-\t\treturn err
-\t}
-\treturn resp.Body.Close()
-}`,
-
-  "Java": `import java.net.URI;
-import java.net.http.*;
-
-public class Feedback {
-    static final HttpClient CLIENT = HttpClient.newHttpClient();
-
-    public static void send(String message, String pageUrl) throws Exception {
-        String json = "{\\"message\\":" + quote(message) + ",\\"pageUrl\\":" + quote(pageUrl) + "}";
-        HttpRequest req = HttpRequest.newBuilder()
-            .uri(URI.create("http://localhost:8181/feedback"))
-            .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer " + System.getenv("PIPE_API_KEY"))
-            .POST(HttpRequest.BodyPublishers.ofString(json))
-            .build();
-        CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
-    }
-
-    private static String quote(String s) {
-        return s == null ? "null" : "\\"" + s.replace("\\"", "\\\\\\"") + "\\"";
-    }
-}`
+  "SQL (test)": `insert into public.feedback (message, page_url, user_email)
+values ('The checkout button does nothing on mobile', '/cart', 'test@example.com');`
 };
 
 var tabsEl = document.getElementById('tabs');
 var snippetEl = document.getElementById('snippet');
-Object.keys(snippets).forEach(function(lang, i){
-  var t = document.createElement('button');
-  t.className = 'tab' + (i===0?' active':'');
-  t.textContent = lang;
-  t.addEventListener('click', function(){
-    document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active')});
-    t.classList.add('active');
-    snippetEl.textContent = snippets[lang];
+Object.keys(snippets).forEach(function(name, i){
+  var tab = document.createElement('button');
+  tab.className = 'tab' + (i === 0 ? ' active' : '');
+  tab.textContent = name;
+  tab.addEventListener('click', function(){
+    document.querySelectorAll('.tab').forEach(function(o){ o.classList.remove('active'); });
+    tab.classList.add('active');
+    snippetEl.textContent = snippets[name];
   });
-  tabsEl.appendChild(t);
+  tabsEl.appendChild(tab);
 });
 snippetEl.textContent = snippets[Object.keys(snippets)[0]];
 </script>
