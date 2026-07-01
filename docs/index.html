@@ -199,8 +199,32 @@
       <li class="step">
         <h3>Create the feedback table</h3>
         <span class="where">Supabase → SQL Editor</span>
-        <p>Paste the SQL from <span class="fname">supabase/sql/feedback.sql</span> and click <strong>Run</strong>.
-          This creates the <span class="fname">feedback</span> table your app writes to.</p>
+        <p>Copy this SQL, paste it into the Supabase SQL Editor, and click <strong>Run</strong>. It creates the
+          <span class="fname">feedback</span> table your app writes to, and locks it down so users can insert
+          feedback but never read it back.</p>
+        <div class="code"><button class="copy">Copy</button><pre>create table if not exists public.feedback (
+  id uuid primary key default gen_random_uuid(),
+  message text not null,
+  page_url text,
+  user_email text,
+  github_issue_url text,
+  status text not null default 'new',
+  created_at timestamptz not null default now()
+);
+
+alter table public.feedback enable row level security;
+
+create policy "Anyone can submit feedback"
+on public.feedback
+for insert
+to anon, authenticated
+with check (true);
+
+create policy "Users cannot read feedback"
+on public.feedback
+for select
+to anon, authenticated
+using (false);</pre></div>
       </li>
 
       <li class="step">
