@@ -113,6 +113,18 @@
     font-weight:700;color:var(--muted);font-size:14px}
   .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
 
+  /* plain story list */
+  .story{counter-reset:n;list-style:none;margin:20px 0 0;padding:0;max-width:70ch}
+  .story li{position:relative;padding:9px 0 9px 36px;border-bottom:1px solid var(--line);color:var(--ink);font-size:15.5px}
+  .story li:last-child{border-bottom:0}
+  .story li:before{counter-increment:n;content:counter(n);position:absolute;left:0;top:8px;width:24px;height:24px;
+    border-radius:50%;background:var(--accent-soft);color:var(--accent-dark);font-size:12px;font-weight:800;
+    display:grid;place-items:center}
+  /* grouped variable table */
+  td.grp{background:var(--accent-soft);font-weight:800;color:var(--accent-dark);letter-spacing:.02em}
+  .vt code{background:#fff;border:1px solid var(--line2);border-radius:6px;padding:1px 6px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9em;color:#0f172a}
+  .tinylink{font-size:13.5px;color:var(--muted);margin-top:6px}
   footer{border-top:1px solid var(--line);padding:34px 0 60px;color:var(--muted);text-align:center;font-size:14.5px}
 
   @media(max-width:820px){
@@ -140,8 +152,8 @@
     <nav class="navlinks">
       <a href="#how">How it works</a>
       <a href="#setup">Setup</a>
+      <a href="#vars">Variables</a>
       <a href="#test">Test</a>
-      <a href="#app">Add to your app</a>
     </nav>
   </div>
 </div>
@@ -174,6 +186,19 @@
       <div class="arrow">→</div>
       <div class="node"><div class="k">Your machine</div><h4>Runs the agent</h4><p>A watcher sees the issue and starts your agent.</p></div>
     </div>
+
+    <h3 style="margin:30px 0 0;font-size:19px">The whole story, in plain words</h3>
+    <ol class="story">
+      <li>A user types feedback and clicks send.</li>
+      <li>Your code saves one row in the <span class="fname">feedback</span> table. That is the only code you write.</li>
+      <li>Supabase notices the new row and calls your function.</li>
+      <li>The function checks a secret, then opens a GitHub issue labeled <span class="fname">agent-ready</span>.</li>
+      <li>A watcher on your machine asks GitHub every minute: any open issues labeled <span class="fname">agent-ready</span>?</li>
+      <li>It finds the new one, writes it into a prompt file, and starts your agent in the repo.</li>
+      <li>The agent reads the issue and changes the code.</li>
+    </ol>
+    <div class="note">Each part knows only the next. Your app knows Supabase. Supabase knows GitHub. The watcher
+      knows GitHub and the agent. No single part sees the whole chain — which is what keeps it safe.</div>
   </section>
 
   <!-- PREREQUISITES -->
@@ -181,9 +206,12 @@
     <span class="tag">Before you start</span>
     <h2>What you need</h2>
     <div class="cards">
-      <div class="card"><b>Supabase project</b><p>Hosts the feedback table, the webhook, and the Edge Function.</p></div>
-      <div class="card"><b>GitHub repo + token</b><p>Where issues are created. Token needs <em>Issues: read &amp; write</em>.</p></div>
-      <div class="card"><b>A machine to run the watcher</b><p>Your laptop or a Mac mini with Node.js 20+ and your coding agent installed.</p></div>
+      <div class="card"><b>Supabase project</b><p>Hosts the feedback table, webhook, and function. You'll copy its
+        <em>Project URL</em> and <em>anon key</em> from Settings → API.</p></div>
+      <div class="card"><b>GitHub repo + token</b><p>Where issues are created. Make a token with
+        <em>Issues: read &amp; write</em> at github.com → Settings → Developer settings → Tokens.</p></div>
+      <div class="card"><b>A machine to run the watcher</b><p>Your laptop or a Mac mini with Node.js 20+ and your
+        coding agent (Claude Code by default) installed.</p></div>
     </div>
   </section>
 
@@ -258,21 +286,40 @@ supabase secrets set WEBHOOK_SECRET="make-a-long-random-secret"</pre></div>
           <li>URL <span class="fname">https://YOUR_PROJECT_REF.supabase.co/functions/v1/create-github-issue</span></li>
           <li>Header <span class="fname">x-feedback-webhook-secret</span> = your <span class="fname">WEBHOOK_SECRET</span></li>
         </ul>
+        <div class="note here"><strong>These two must be the exact same string:</strong> the
+          <span class="fname">WEBHOOK_SECRET</span> you set in step 3, and the header value here. That match is how
+          Supabase proves the call really came from your table.</div>
       </li>
     </ol>
 
     <div class="phase"><span class="pill">Part 2</span> Your app</div>
     <ol class="steps" style="counter-reset:s 4">
       <li class="step">
-        <h3>Save feedback from your app</h3>
-        <span class="where">Your feedback form handler</span>
-        <p>This is the <strong>only</strong> code your app adds. Put it where the user's feedback is submitted —
-          it just inserts a row. Supabase and GitHub do the rest.</p>
-        <div class="code"><button class="copy">Copy</button><pre>await supabase.from("feedback").insert({
-  message: feedbackMessage,
-  page_url: window.location.pathname,
-  user_email: user?.email ?? null
+        <h3>Connect your app to Supabase, and send feedback</h3>
+        <span class="where">Your app code</span>
+        <p>This is the <strong>only</strong> code your app adds. First install the Supabase client:</p>
+        <div class="code"><button class="copy">Copy</button><pre>npm install @supabase/supabase-js</pre></div>
+        <p>Then create the client with your two public values, and insert a row when feedback is submitted:</p>
+        <div class="code"><button class="copy">Copy</button><pre>import { createClient } from "@supabase/supabase-js";
+
+// Both values come from Supabase → Settings → API. Neither is secret.
+const supabase = createClient(
+  "https://YOUR_PROJECT_REF.supabase.co",  // Project URL
+  "YOUR_ANON_KEY"                          // anon public key
+);
+
+// Run this when the user submits feedback:
+await supabase.from("feedback").insert({
+  message: feedbackText,                // required
+  page_url: window.location.pathname,   // optional
+  user_email: user?.email ?? null       // optional
 });</pre></div>
+        <ul class="check">
+          <li>Only these three columns matter: <span class="fname">message</span>, <span class="fname">page_url</span>,
+            <span class="fname">user_email</span>. The table fills in the rest.</li>
+          <li>The anon key is safe in the browser: the SQL from step 1 lets users insert feedback but never read it.</li>
+          <li>Your app talks only to Supabase. It never sees GitHub or your token.</li>
+        </ul>
       </li>
     </ol>
 
@@ -310,14 +357,38 @@ values ('The checkout button does nothing on mobile', '/cart', 'test@example.com
     </div>
   </section>
 
-  <!-- ADD TO YOUR APP -->
+  <!-- VARIABLES -->
+  <section id="vars">
+    <span class="tag">Reference</span>
+    <h2>Every variable, and where it lives</h2>
+    <p class="lead">Three places. Each holds its own values, and they do not mix. If something breaks, it is almost
+      always a value in the wrong place.</p>
+    <table class="vt">
+      <tr><th>Variable</th><th>Where you set it</th><th>What it is</th></tr>
+      <tr><td class="grp" colspan="3">In your app — public, safe in the browser</td></tr>
+      <tr><td>Project URL</td><td>Your app code (createClient)</td><td>Supabase → Settings → API → Project URL</td></tr>
+      <tr><td>anon key</td><td>Your app code (createClient)</td><td>Supabase → Settings → API → anon public key</td></tr>
+      <tr><td class="grp" colspan="3">In Supabase, on the function — secret</td></tr>
+      <tr><td><code>GITHUB_OWNER</code></td><td><code>supabase secrets set</code></td><td>Your GitHub user or org name</td></tr>
+      <tr><td><code>GITHUB_REPO</code></td><td><code>supabase secrets set</code></td><td>The repo where issues are created</td></tr>
+      <tr><td><code>GITHUB_TOKEN</code></td><td><code>supabase secrets set</code></td><td>Token that may <em>write</em> issues. Never in your app.</td></tr>
+      <tr><td><code>WEBHOOK_SECRET</code></td><td><code>supabase secrets set</code> + webhook header</td><td>A random string you invent. Must match in both spots.</td></tr>
+      <tr><td class="grp" colspan="3">On your machine, on the watcher — passed when you run it</td></tr>
+      <tr><td><code>GITHUB_OWNER</code></td><td>Env var in the run command</td><td>Same GitHub name</td></tr>
+      <tr><td><code>GITHUB_REPO</code></td><td>Env var in the run command</td><td>Same repo</td></tr>
+      <tr><td><code>GITHUB_TOKEN</code></td><td>Env var in the run command</td><td>Token that may <em>read</em> issues</td></tr>
+      <tr><td><code>AGENT_REPO</code></td><td>Env var in the run command</td><td>Absolute path to the repo the agent may edit</td></tr>
+    </table>
+    <div class="note warn"><strong>The GitHub token never goes in your app.</strong> It lives only in Supabase's
+      secrets and on your machine. The browser only ever holds the public Project URL and anon key.</div>
+  </section>
+
+  <!-- OTHER STACKS -->
   <section id="app">
-    <span class="tag">Integration</span>
-    <h2>Add it to your app</h2>
-    <p class="lead">The whole app-side change is inserting one row into Supabase when feedback is submitted.
-      Pick the version closest to your stack.</p>
-    <div class="note warn"><strong>Never put the GitHub token in your app.</strong> It lives only in the Supabase
-      function's secrets. Your app talks to Supabase, nothing else.</div>
+    <span class="tag">Optional</span>
+    <h2>Your app, in another stack</h2>
+    <p class="lead">The app step above uses plain JavaScript. Here is the same insert for a few other setups —
+      they all do one thing: save a row.</p>
     <div class="tabs" id="tabs"></div>
     <div class="code"><button class="copy">Copy</button><pre id="snippet"></pre></div>
   </section>
@@ -343,7 +414,14 @@ document.querySelectorAll('.code .copy').forEach(function(btn){
 });
 
 var snippets = {
-  "Supabase (browser)": `async function sendFeedback(feedbackMessage, user) {
+  "Supabase (browser)": `import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  "https://YOUR_PROJECT_REF.supabase.co", // Project URL
+  "YOUR_ANON_KEY"                         // anon public key
+);
+
+async function sendFeedback(feedbackMessage, user) {
   const { error } = await supabase.from("feedback").insert({
     message: feedbackMessage,
     page_url: window.location.pathname,
