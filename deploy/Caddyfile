@@ -1,0 +1,15 @@
+# Auto-HTTPS reverse proxy in front of the Feedback Pipe.
+#
+# Caddy fetches and renews a real TLS certificate for your domain automatically
+# (Let's Encrypt), terminates HTTPS, and forwards to the pipe on loopback. The
+# pipe itself stays bound to 127.0.0.1 — only Caddy is exposed to the internet.
+#
+# Prereqs: a domain's A/AAAA record pointing at this machine, ports 80 and 443
+# open. Then: `caddy run --config deploy/Caddyfile` (or install as a service).
+# Point the tutor's PIPE_URL at https://pipe.example.com.
+
+pipe.example.com {
+	encode zstd gzip
+	# The pipe listens on PIPE_PORT (default 8181), on loopback.
+	reverse_proxy 127.0.0.1:8181
+}

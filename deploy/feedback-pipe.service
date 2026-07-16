@@ -1,0 +1,33 @@
+# systemd unit that keeps the Feedback Pipe running (restarts on crash/reboot).
+#
+# Install:
+#   sudo cp deploy/feedback-pipe.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now feedback-pipe
+#
+# Edit User, WorkingDirectory, and the two env files for your host. The agent
+# (Claude Code) authenticates from the service user's own environment — run
+# `claude login` as that user once (OAuth / subscription), and no API key needs
+# to live here.
+
+[Unit]
+Description=Feedback Pipe
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pipe
+WorkingDirectory=/opt/feedback-pipe
+# PIPE_API_KEY and PIPE_REPO live here (chmod 600, not world-readable).
+EnvironmentFile=/etc/feedback-pipe.env
+# Recommended for production: run the agent in review-before-merge mode.
+Environment=PIPE_AGENT_COMMAND=/opt/feedback-pipe/examples/agents/review-agent.sh
+ExecStart=/usr/bin/npm run pipe
+Restart=on-failure
+RestartSec=3
+# The pipe stays on loopback; a reverse proxy (Caddy) or tunnel provides HTTPS.
+Environment=PIPE_HOST=127.0.0.1
+
+[Install]
+WantedBy=multi-user.target

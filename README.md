@@ -88,6 +88,31 @@ curl -sS http://localhost:8181/feedback \
 Task files are written to `<repo>/.ape/tasks/<id>/`; the pipe drops a
 `.ape/.gitignore` so they never enter git history.
 
+## Production: review-before-merge + HTTPS
+
+For local use the default agent edits the working tree directly. In production
+the feedback is **untrusted end-user input**, so the agent must produce
+*reviewable* output instead of touching the default branch. Point the pipe at
+the included review agent:
+
+```bash
+PIPE_AGENT_COMMAND=/absolute/path/to/examples/agents/review-agent.sh
+```
+
+It runs each task on its own branch and opens a **draft pull request** a human
+approves — the default branch is never changed automatically
+([examples/agents/review-agent.sh](examples/agents/review-agent.sh), tested by
+`examples/agents/review-agent.test.js`).
+
+**Agent auth is OAuth, not a key in the pipe.** The agent inherits the pipe's
+environment, so run `claude login` (OAuth / subscription) once on the host and
+the pipe holds no model credential of its own — only its inbound `PIPE_API_KEY`.
+
+The pipe is a long-running process (not serverless), reached over HTTPS via a
+reverse proxy or tunnel. Turnkey configs — Caddy (auto-TLS), a Cloudflare
+Tunnel, and a systemd unit — plus a full checklist are in
+[deploy/README.md](deploy/README.md).
+
 ## Design
 
 The reasoning behind the shape of the system — why one program is enough, what
