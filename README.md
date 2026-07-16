@@ -5,27 +5,53 @@ agent (e.g. Claude Code). It has no model and makes no judgement about the code 
 it is the wire, not the worker.
 
 ```
-feedback (HTTP, authenticated)  ->  pipe  ->  spawns the entity's agent in the repo
+feedback (HTTP, authenticated)  ->  pipe  ->  runs the entity's agent in the repo
 ```
+
+## The integration contract (all of it)
+
+Your app makes **one authenticated HTTP POST** with the user's feedback.
+That is the entire integration — no SDK, no schema, no callback to handle.
+
+```
+POST /feedback
+Authorization: Bearer <PIPE_API_KEY>
+Content-Type: application/json
+
+{ "message": "The checkout button does nothing on mobile" }   <- only required field
+```
+
+Response: `202 { "taskId": "...", "status": "forwarded" }`. Put this call
+wherever your app already handles a submitted feedback message — your form
+handler, your `/feedback` route, your support endpoint. Copy-paste snippets for
+JavaScript, Node, Python, Ruby, PHP, Go, Java, and curl are in
+[docs/integration.md](docs/integration.md).
 
 ## What it is and is not
 
 - **Is:** an HTTP endpoint on the machine where the agent runs. It receives
-  feedback, writes the user's words verbatim into a prompt file, and starts the
-  entity's agent in their repository.
+  feedback, writes the user's words verbatim into a prompt file, and runs the
+  entity's agent in their repository — one agent at a time, because two agents
+  editing the same checkout would corrupt each other's work.
 - **Is not:** an AI. It contains no model, no priority guessing, no rewriting of
   the feedback. The agent decides everything.
+- **One direction:** the pipe never reports back to the sender. It answers
+  `202` when the task is queued, and what the agent does next (edit code, open
+  a PR, etc.) is entirely the agent's concern.
 
 ## Two keys (two trust boundaries)
 
 1. **Inbound key (`PIPE_API_KEY`)** — proves the caller may submit feedback to
-   this pipe. You generate one per entity and put it in their config.
-2. **Model key** — the agent's own provider key (e.g. `OPENAI_API_KEY`). It lives
-   only in the agent's environment. The pipe never sees it.
+   this pipe. You generate one per entity and put it in their config. Because
+   feedback is handed verbatim to an agent that edits the repository, this key
+   is effectively **write access to the codebase** — treat it like a deploy key.
+2. **Model key** — the agent's own provider key (e.g. `ANTHROPIC_API_KEY`). It
+   lives only in the agent's environment. The pipe never sees it.
 
 ## Download and run
 
-Requires Node 20+ and your coding agent (Claude Code by default).
+Requires Node 20+ and your coding agent (Claude Code by default) on the same
+machine.
 
 ```bash
 git clone https://github.com/Jakobyht/feedback-pipe.git
@@ -48,25 +74,25 @@ curl -sS http://localhost:8181/feedback \
   -d '{"message":"The checkout button does nothing on mobile","pageUrl":"/cart"}'
 ```
 
-The pipe responds `202 { taskId, status: "forwarded" }` the moment it launches
-the agent, and then it is done. It is a one-way pipe: it does not wait for the
-agent, track it, or report the result back. What the agent does next (edit code,
-open a PR, etc.) is entirely the agent's concern.
-
 ## Environment variables
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `PIPE_API_KEY` | yes | Inbound key this entity authenticates with |
-| `PIPE_REPO` | yes | Repository the agent works on |
-| `PIPE_AGENT_COMMAND` | yes | The entity's agent (e.g. Claude Code). Gets `APE_TASK_PROMPT_FILE`, `APE_TASK_FILE`, `APE_TASK_ID`, `APE_REPO_PATH` |
+| `PIPE_API_KEY` | yes | Inbound key callers must send (any long random string) |
+| `PIPE_REPO` | yes | Absolute path to the repository the agent works on |
+| `PIPE_AGENT_COMMAND` | no | The agent to run (defaults to Claude Code headless). Gets `APE_TASK_PROMPT_FILE`, `APE_TASK_FILE`, `APE_TASK_ID`, `APE_REPO_PATH` |
 | `PIPE_PORT` | no | Listen port (default 8181) |
-| `PIPE_WORKSPACE` | no | Label attached to tasks (default "default") |
+| `PIPE_HOST` | no | Bind address (default `127.0.0.1`; `0.0.0.0` accepts remote calls) |
+| `PIPE_WORKSPACE` | no | Label attached to tasks (default `default`) |
 
-## Integrate it
+Task files are written to `<repo>/.ape/tasks/<id>/`; the pipe drops a
+`.ape/.gitignore` so they never enter git history.
 
-To send feedback from your own app (snippets for JavaScript, Node, Python, Ruby,
-PHP, Go, Java, curl) see [docs/integration.md](docs/integration.md).
+## Design
+
+The reasoning behind the shape of the system — why one program is enough, what
+premise that rests on, and the one invariant the pipe enforces (one working
+tree, one writer) — is in [docs/architecture.md](docs/architecture.md).
 
 ## Packages
 

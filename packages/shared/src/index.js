@@ -42,22 +42,6 @@ export function buildAgentPrompt(task) {
   return lines.filter((line) => line !== null).join("\n");
 }
 
-export function createEnvelope(type, payload) {
-  return {
-    type,
-    payload,
-    sentAt: new Date().toISOString()
-  };
-}
-
-export function safeJsonParse(input) {
-  try {
-    return { ok: true, value: JSON.parse(input) };
-  } catch (error) {
-    return { ok: false, error };
-  }
-}
-
 function requireNonEmptyString(value, fieldName) {
   if (typeof value !== "string" || !value.trim()) {
     throw new Error(`${fieldName} must be a non-empty string`);

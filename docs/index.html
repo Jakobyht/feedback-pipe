@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Feedback Agent — Setup Guide</title>
-<meta name="description" content="Step-by-step setup: turn app feedback into GitHub issues, then let a local coding agent fix them." />
+<title>Feedback Pipe — Setup Guide</title>
+<meta name="description" content="One POST turns user feedback into agent work: a single local program hands feedback verbatim to your own coding agent." />
 <style>
   :root{
     --bg:#f6f2ea; --paper:#fffdf9; --ink:#182a30; --muted:#5c6b74;
@@ -70,10 +70,7 @@
   .card b{display:block;margin-bottom:5px;color:var(--ink)}
   .card p{margin:0;color:var(--muted);font-size:14.5px}
 
-  /* phase + steps */
-  .phase{display:flex;align-items:center;gap:10px;margin:30px 0 6px;font-weight:800;color:var(--accent-dark)}
-  .phase .pill{background:var(--accent);color:#fff;border-radius:999px;font-size:12px;font-weight:800;
-    padding:3px 10px;letter-spacing:.03em}
+  /* steps */
   .steps{list-style:none;margin:0;padding:0;counter-reset:s}
   .step{position:relative;background:var(--paper);border:1px solid var(--line);border-radius:14px;
     padding:22px 22px 22px 70px;margin:14px 0;box-shadow:var(--shadow)}
@@ -121,10 +118,13 @@
     border-radius:50%;background:var(--accent-soft);color:var(--accent-dark);font-size:12px;font-weight:800;
     display:grid;place-items:center}
   /* grouped variable table */
+  table.vt{width:100%;border-collapse:collapse;margin-top:16px;background:var(--paper);
+    border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .vt th,.vt td{padding:10px 13px;border-bottom:1px solid var(--line);text-align:left;font-size:14.5px}
+  .vt th{background:var(--accent-soft);color:var(--accent-dark)}
   td.grp{background:var(--accent-soft);font-weight:800;color:var(--accent-dark);letter-spacing:.02em}
   .vt code{background:#fff;border:1px solid var(--line2);border-radius:6px;padding:1px 6px;
     font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9em;color:#0f172a}
-  .tinylink{font-size:13.5px;color:var(--muted);margin-top:6px}
   footer{border-top:1px solid var(--line);padding:34px 0 60px;color:var(--muted);text-align:center;font-size:14.5px}
 
   @media(max-width:820px){
@@ -148,12 +148,12 @@
 
 <div class="top">
   <div class="wrap">
-    <span class="brand"><span class="glyph"></span> Feedback Agent</span>
+    <span class="brand"><span class="glyph"></span> Feedback Pipe</span>
     <nav class="navlinks">
       <a href="#how">How it works</a>
       <a href="#setup">Setup</a>
+      <a href="#api">API</a>
       <a href="#vars">Variables</a>
-      <a href="#test">Test</a>
     </nav>
   </div>
 </div>
@@ -161,9 +161,10 @@
 <header class="hero">
   <div class="wrap">
     <span class="eyebrow">● Step-by-step setup guide</span>
-    <h1>Turn app feedback into agent work.</h1>
-    <p class="sub">User feedback becomes a GitHub issue, and a small watcher on your own machine hands
-      that issue to your coding agent. You wire it up once — this page shows every step.</p>
+    <h1>One POST turns feedback into agent work.</h1>
+    <p class="sub">A single local program on the machine where your coding agent lives. It receives a
+      feedback message over HTTP and hands the user's words verbatim to your agent — no model,
+      no judgement, no cloud. Your app's entire integration is one HTTP call.</p>
     <div class="cta">
       <a class="btn primary" href="#setup">Start the setup ↓</a>
       <a class="btn ghost" href="https://github.com/Jakobyht/feedback-pipe" target="_blank" rel="noopener">GitHub project ↗</a>
@@ -176,29 +177,29 @@
   <!-- HOW IT WORKS -->
   <section id="how">
     <span class="tag">How it works</span>
-    <h2>Three moving parts</h2>
-    <p class="lead">Your app only saves feedback. Supabase turns it into a GitHub issue. A watcher on your
-      machine sees the issue and starts the agent. GitHub in the middle keeps everything visible and reviewable.</p>
+    <h2>Three parts, one direction</h2>
+    <p class="lead">Your app sends one authenticated POST. The pipe writes the feedback into a prompt file
+      and runs your agent in your repository — one agent at a time. Nothing ever flows back to the sender.</p>
     <div class="flow">
-      <div class="node"><div class="k">Your app</div><h4>Saves feedback</h4><p>Inserts one row into a Supabase table.</p></div>
+      <div class="node"><div class="k">Your app</div><h4>Sends one POST</h4><p>The feedback message, with your <span class="fname">PIPE_API_KEY</span> as a Bearer token.</p></div>
       <div class="arrow">→</div>
-      <div class="node"><div class="k">Supabase → GitHub</div><h4>Creates an issue</h4><p>An Edge Function opens a labeled GitHub issue.</p></div>
+      <div class="node"><div class="k">The pipe</div><h4>Writes &amp; queues</h4><p>Saves the words verbatim to <span class="fname">.ape/tasks/&lt;id&gt;/task.md</span> and queues the run.</p></div>
       <div class="arrow">→</div>
-      <div class="node"><div class="k">Your machine</div><h4>Runs the agent</h4><p>A watcher sees the issue and starts your agent.</p></div>
+      <div class="node"><div class="k">Your agent</div><h4>Edits the code</h4><p>Claude Code by default. It reads the prompt and decides everything.</p></div>
     </div>
 
     <h3 style="margin:30px 0 0;font-size:19px">The whole story, in plain words</h3>
     <ol class="story">
       <li>A user types feedback and clicks send.</li>
-      <li>Your code saves one row in the <span class="fname">feedback</span> table. That is the only code you write.</li>
-      <li>Supabase notices the new row and calls your function.</li>
-      <li>The function checks a secret, then opens a GitHub issue labeled <span class="fname">agent-ready</span>.</li>
-      <li>A watcher on your machine asks GitHub every minute: any open issues labeled <span class="fname">agent-ready</span>?</li>
-      <li>It finds the new one, writes it into a prompt file, and starts your agent in the repo.</li>
-      <li>The agent reads the issue and changes the code.</li>
+      <li>Your code makes one HTTP POST to the pipe. That is the only code you write.</li>
+      <li>The pipe checks the key and answers <span class="fname">202</span> immediately.</li>
+      <li>It writes the user's words, unchanged, into a prompt file inside your repo.</li>
+      <li>It starts your agent in the repo — or queues the task if an agent is already running,
+        because two agents editing the same checkout would corrupt each other's work.</li>
+      <li>The agent reads the feedback and changes the code. The pipe never reports back.</li>
     </ol>
-    <div class="note">Each part knows only the next. Your app knows Supabase. Supabase knows GitHub. The watcher
-      knows GitHub and the agent. No single part sees the whole chain — which is what keeps it safe.</div>
+    <div class="note">The pipe contains no AI. It assigns no priority, invents no acceptance criteria,
+      rewrites nothing. It is the wire, not the worker — every decision about the code belongs to the agent.</div>
   </section>
 
   <!-- PREREQUISITES -->
@@ -206,12 +207,11 @@
     <span class="tag">Before you start</span>
     <h2>What you need</h2>
     <div class="cards">
-      <div class="card"><b>Supabase project</b><p>Hosts the feedback table, webhook, and function. You'll copy its
-        <em>Project URL</em> and <em>anon key</em> from Settings → API.</p></div>
-      <div class="card"><b>GitHub repo + token</b><p>Where issues are created. Make a token with
-        <em>Issues: read &amp; write</em> at github.com → Settings → Developer settings → Tokens.</p></div>
-      <div class="card"><b>A machine to run the watcher</b><p>Your laptop or a Mac mini with Node.js 20+ and your
-        coding agent (Claude Code by default) installed.</p></div>
+      <div class="card"><b>Node.js 20+</b><p>The pipe is a single Node program with zero runtime dependencies.</p></div>
+      <div class="card"><b>Your coding agent</b><p>Installed on the same machine. Claude Code (the <span class="fname">claude</span>
+        command) by default; any CLI agent works via <span class="fname">PIPE_AGENT_COMMAND</span>.</p></div>
+      <div class="card"><b>A local checkout of your repo</b><p>The repository the agent will edit. The pipe writes task
+        files into <span class="fname">.ape/</span> there (kept out of git automatically).</p></div>
     </div>
   </section>
 
@@ -219,185 +219,124 @@
   <section id="setup">
     <span class="tag">The tutorial</span>
     <h2>Step-by-step setup</h2>
-    <p class="lead">Do these in order. Steps 1–4 set up Supabase → GitHub. Step 5 is the one line your app adds.
-      Step 6 starts the watcher on your machine.</p>
+    <p class="lead">Steps 1–3 run the pipe on the agent's machine. Step 4 is the one call your app adds.
+      Step 5 proves the whole path works.</p>
 
-    <div class="phase"><span class="pill">Part 1</span> Supabase → GitHub issues</div>
     <ol class="steps">
       <li class="step">
-        <h3>Create the feedback table</h3>
-        <span class="where">Supabase → SQL Editor</span>
-        <p>Copy this SQL, paste it into the Supabase SQL Editor, and click <strong>Run</strong>. It creates the
-          <span class="fname">feedback</span> table your app writes to, and locks it down so users can insert
-          feedback but never read it back.</p>
-        <div class="code"><button class="copy">Copy</button><pre>create table if not exists public.feedback (
-  id uuid primary key default gen_random_uuid(),
-  message text not null,
-  page_url text,
-  user_email text,
-  github_issue_url text,
-  status text not null default 'new',
-  created_at timestamptz not null default now()
-);
-
-alter table public.feedback enable row level security;
-
-create policy "Anyone can submit feedback"
-on public.feedback
-for insert
-to anon, authenticated
-with check (true);
-
-create policy "Users cannot read feedback"
-on public.feedback
-for select
-to anon, authenticated
-using (false);</pre></div>
+        <h3>Install the pipe</h3>
+        <span class="where">Terminal on the agent's machine</span>
+        <p>Clone and install. There is nothing to build.</p>
+        <div class="code"><button class="copy">Copy</button><pre>git clone https://github.com/Jakobyht/feedback-pipe.git
+cd feedback-pipe
+npm install</pre></div>
       </li>
 
       <li class="step">
-        <h3>Deploy the Edge Function</h3>
-        <span class="where">Terminal (Supabase CLI)</span>
-        <p>This function receives a new feedback row and creates the GitHub issue. Its code is in
-          <span class="fname">supabase/functions/create-github-issue/index.ts</span>.</p>
-        <div class="code"><button class="copy">Copy</button><pre>supabase functions deploy create-github-issue --no-verify-jwt</pre></div>
-      </li>
-
-      <li class="step">
-        <h3>Set the function's secrets</h3>
-        <span class="where">Terminal (Supabase CLI)</span>
-        <p>Give the function your GitHub details. Replace the values with your own.</p>
-        <div class="code"><button class="copy">Copy</button><pre>supabase secrets set GITHUB_OWNER="your-github-user-or-org"
-supabase secrets set GITHUB_REPO="your-repo-name"
-supabase secrets set GITHUB_TOKEN="your-github-token"
-supabase secrets set WEBHOOK_SECRET="make-a-long-random-secret"</pre></div>
+        <h3>Configure it</h3>
+        <span class="where">Terminal — edit <span class="fname">.env</span></span>
+        <p>Copy the template and set the two required values. <span class="fname">.env</span> is per-machine and never committed.</p>
+        <div class="code"><button class="copy">Copy</button><pre>cp .env.example .env</pre></div>
+        <div class="code"><button class="copy">Copy</button><pre># .env
+PIPE_API_KEY=make-a-long-random-secret
+PIPE_REPO=/absolute/path/to/the/repo/the/agent/edits</pre></div>
         <ul class="check">
-          <li>The GitHub token stays in Supabase — it never touches your app or browser.</li>
-          <li>New issues are labeled <span class="fname">user-feedback</span> and <span class="fname">agent-ready</span>.</li>
+          <li>The agent defaults to Claude Code headless. Override with <span class="fname">PIPE_AGENT_COMMAND</span> for Codex, Aider, or anything else.</li>
+          <li>The agent's own model key (e.g. <span class="fname">ANTHROPIC_API_KEY</span>) stays in the agent's environment — the pipe never sees it.</li>
         </ul>
       </li>
 
       <li class="step">
-        <h3>Connect the table to the function</h3>
-        <span class="where">Supabase → Database → Webhooks</span>
-        <p>Create a webhook so every new feedback row calls the function.</p>
-        <ul class="check">
-          <li>Table <span class="fname">feedback</span>, event <span class="fname">INSERT</span>, method <span class="fname">POST</span></li>
-          <li>URL <span class="fname">https://YOUR_PROJECT_REF.supabase.co/functions/v1/create-github-issue</span></li>
-          <li>Header <span class="fname">x-feedback-webhook-secret</span> = your <span class="fname">WEBHOOK_SECRET</span></li>
-        </ul>
-        <div class="note here"><strong>These two must be the exact same string:</strong> the
-          <span class="fname">WEBHOOK_SECRET</span> you set in step 3, and the header value here. That match is how
-          Supabase proves the call really came from your table.</div>
+        <h3>Run it</h3>
+        <span class="where">Terminal on the agent's machine</span>
+        <div class="code"><button class="copy">Copy</button><pre>npm run pipe</pre></div>
+        <p>It prints <span class="fname">Feedback pipe listening on http://127.0.0.1:8181</span>. Check it is alive:</p>
+        <div class="code"><button class="copy">Copy</button><pre>curl -s http://localhost:8181/health</pre></div>
       </li>
-    </ol>
 
-    <div class="phase"><span class="pill">Part 2</span> Your app</div>
-    <ol class="steps" style="counter-reset:s 4">
       <li class="step">
-        <h3>Connect your app to Supabase, and send feedback</h3>
-        <span class="where">Your app code</span>
-        <p>This is the <strong>only</strong> code your app adds. First install the Supabase client:</p>
-        <div class="code"><button class="copy">Copy</button><pre>npm install @supabase/supabase-js</pre></div>
-        <p>Then create the client with your two public values, and insert a row when feedback is submitted:</p>
-        <div class="code"><button class="copy">Copy</button><pre>import { createClient } from "@supabase/supabase-js";
-
-// Both values come from Supabase → Settings → API. Neither is secret.
-const supabase = createClient(
-  "https://YOUR_PROJECT_REF.supabase.co",  // Project URL
-  "YOUR_ANON_KEY"                          // anon public key
-);
-
-// Run this when the user submits feedback:
-await supabase.from("feedback").insert({
-  message: feedbackText,                // required
-  page_url: window.location.pathname,   // optional
-  user_email: user?.email ?? null       // optional
-});</pre></div>
-        <ul class="check">
-          <li>Only these three columns matter: <span class="fname">message</span>, <span class="fname">page_url</span>,
-            <span class="fname">user_email</span>. The table fills in the rest.</li>
-          <li>The anon key is safe in the browser: the SQL from step 1 lets users insert feedback but never read it.</li>
-          <li>Your app talks only to Supabase. It never sees GitHub or your token.</li>
-        </ul>
+        <h3>Send feedback from your app</h3>
+        <span class="where">Your app code — wherever feedback is already handled</span>
+        <p>Add one HTTP call in the function your app <strong>already</strong> has for a submitted feedback
+          message — your form handler, your <span class="fname">/feedback</span> route, your support endpoint.
+          Only <span class="fname">message</span> is required.</p>
+        <div class="tabs" id="tabs"></div>
+        <div class="code"><button class="copy">Copy</button><pre id="snippet"></pre></div>
+        <p class="lead" style="font-size:14.5px;margin-top:8px">More languages (Ruby, PHP, Go, Java) in
+          <a href="https://github.com/Jakobyht/feedback-pipe/blob/main/docs/integration.md" target="_blank" rel="noopener">docs/integration.md</a>.</p>
+        <div class="note warn"><strong>Call the pipe from your backend.</strong> Whoever holds
+          <span class="fname">PIPE_API_KEY</span> can direct an agent that edits your code — the key is effectively
+          write access to the codebase. Never ship it to a browser; treat it like a deploy key.</div>
       </li>
-    </ol>
 
-    <div class="phase"><span class="pill">Part 3</span> Your machine</div>
-    <ol class="steps" style="counter-reset:s 5">
       <li class="step">
-        <h3>Start the watcher</h3>
-        <span class="where">Terminal on your laptop / Mac mini</span>
-        <p>It polls GitHub for issues labeled <span class="fname">agent-ready</span> and starts your agent on the repo.
-          Leave the window open — closing it stops the watcher.</p>
-        <div class="code"><button class="copy">Copy</button><pre>GITHUB_OWNER="your-github-user-or-org" \
-GITHUB_REPO="your-repo-name" \
-GITHUB_TOKEN="your-github-token" \
-AGENT_REPO="/absolute/path/to/the/code/repo" \
-npm run github-agent</pre></div>
-        <p style="margin-top:10px;color:var(--muted);font-size:14.5px">The agent defaults to Claude Code. Override it
-          with <span class="fname">AGENT_COMMAND</span> to use Codex, Aider, or anything else.</p>
+        <h3>Test the whole flow</h3>
+        <span class="where">Terminal</span>
+        <p>Send one message with curl and watch the pipe's terminal.</p>
+        <div class="code"><button class="copy">Copy</button><pre>curl -sS http://localhost:8181/feedback \
+  -H "authorization: Bearer $PIPE_API_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"message":"The checkout button does nothing on mobile","pageUrl":"/cart"}'</pre></div>
+        <div class="note here"><strong>Expected:</strong> the response is <span class="fname">202 {"taskId": …, "status": "forwarded"}</span>,
+          the pipe logs <span class="fname">[task_…] agent started</span>, and your agent begins working in the repo.</div>
+        <div class="cards">
+          <div class="card"><b>401 unauthorized</b><p>The Bearer key does not match <span class="fname">PIPE_API_KEY</span> exactly.</p></div>
+          <div class="card"><b>422 errors</b><p><span class="fname">message</span> is missing or empty — it is the only required field.</p></div>
+          <div class="card"><b>202 but no edits</b><p>Check the agent works standalone in that repo (e.g. run <span class="fname">claude</span> there yourself), and read the pipe's log for the agent's exit code.</p></div>
+        </div>
       </li>
     </ol>
   </section>
 
-  <!-- TEST -->
-  <section id="test">
-    <span class="tag">Verify</span>
-    <h2>Test the whole flow</h2>
-    <p class="lead">Insert one feedback row. It should become a GitHub issue, and the watcher should start the agent.</p>
-    <div class="code"><button class="copy">Copy</button><pre>insert into public.feedback (message, page_url, user_email)
-values ('The checkout button does nothing on mobile', '/cart', 'test@example.com');</pre></div>
-    <div class="note here"><strong>Expected:</strong> a new GitHub issue labeled <span class="fname">agent-ready</span>
-      appears, and the watcher terminal shows it starting the agent.</div>
-    <div class="cards">
-      <div class="card"><b>No issue appears</b><p>Check the webhook URL, the secret header, and the token's Issues permission.</p></div>
-      <div class="card"><b>Issue but no agent</b><p>Confirm the issue has <span class="fname">agent-ready</span> and the watcher is running.</p></div>
-      <div class="card"><b>Runs only once</b><p>Intended — handled issues are remembered in <span class="fname">.ape/github-agent/processed.json</span>.</p></div>
-    </div>
+  <!-- API -->
+  <section id="api">
+    <span class="tag">Reference</span>
+    <h2>The API — one endpoint</h2>
+    <p class="lead">Everything your app can do, in one request.</p>
+    <div class="code"><button class="copy">Copy</button><pre>POST /feedback
+Authorization: Bearer &lt;PIPE_API_KEY&gt;
+Content-Type: application/json
+
+{
+  "message":  "The checkout button does nothing on mobile",  // required
+  "pageUrl":  "/cart",                                       // optional
+  "repoHint": "frontend",                                    // optional
+  "metadata": { "userId": "123" }                            // optional
+}</pre></div>
+    <ul class="check">
+      <li><span class="fname">202 { taskId, status: "forwarded" }</span> — accepted and queued for the agent.</li>
+      <li><span class="fname">401</span> wrong key · <span class="fname">400</span> invalid JSON · <span class="fname">422</span> missing message · <span class="fname">413</span> body over 256&nbsp;KB.</li>
+      <li>There is no status endpoint and no callback — the pipe is one-directional by design.</li>
+    </ul>
   </section>
 
   <!-- VARIABLES -->
   <section id="vars">
     <span class="tag">Reference</span>
     <h2>Every variable, and where it lives</h2>
-    <p class="lead">Three places. Each holds its own values, and they do not mix. If something breaks, it is almost
-      always a value in the wrong place.</p>
+    <p class="lead">Two places. The pipe's config stays on the agent's machine; your app holds only the key it sends.</p>
     <table class="vt">
-      <tr><th>Variable</th><th>Where you set it</th><th>What it is</th></tr>
-      <tr><td class="grp" colspan="3">In your app — public, safe in the browser</td></tr>
-      <tr><td>Project URL</td><td>Your app code (createClient)</td><td>Supabase → Settings → API → Project URL</td></tr>
-      <tr><td>anon key</td><td>Your app code (createClient)</td><td>Supabase → Settings → API → anon public key</td></tr>
-      <tr><td class="grp" colspan="3">In Supabase, on the function — secret</td></tr>
-      <tr><td><code>GITHUB_OWNER</code></td><td><code>supabase secrets set</code></td><td>Your GitHub user or org name</td></tr>
-      <tr><td><code>GITHUB_REPO</code></td><td><code>supabase secrets set</code></td><td>The repo where issues are created</td></tr>
-      <tr><td><code>GITHUB_TOKEN</code></td><td><code>supabase secrets set</code></td><td>Token that may <em>write</em> issues. Never in your app.</td></tr>
-      <tr><td><code>WEBHOOK_SECRET</code></td><td><code>supabase secrets set</code> + webhook header</td><td>A random string you invent. Must match in both spots.</td></tr>
-      <tr><td class="grp" colspan="3">On your machine, on the watcher — passed when you run it</td></tr>
-      <tr><td><code>GITHUB_OWNER</code></td><td>Env var in the run command</td><td>Same GitHub name</td></tr>
-      <tr><td><code>GITHUB_REPO</code></td><td>Env var in the run command</td><td>Same repo</td></tr>
-      <tr><td><code>GITHUB_TOKEN</code></td><td>Env var in the run command</td><td>Token that may <em>read</em> issues</td></tr>
-      <tr><td><code>AGENT_REPO</code></td><td>Env var in the run command</td><td>Absolute path to the repo the agent may edit</td></tr>
+      <tr><th>Variable</th><th>Required</th><th>What it is</th></tr>
+      <tr><td class="grp" colspan="3">On the agent's machine — in the pipe's <code>.env</code></td></tr>
+      <tr><td><code>PIPE_API_KEY</code></td><td>yes</td><td>The secret callers must send. Any long random string.</td></tr>
+      <tr><td><code>PIPE_REPO</code></td><td>yes</td><td>Absolute path to the repository the agent edits.</td></tr>
+      <tr><td><code>PIPE_AGENT_COMMAND</code></td><td>no</td><td>The agent to run. Defaults to Claude Code headless. Receives <code>APE_TASK_PROMPT_FILE</code>, <code>APE_TASK_FILE</code>, <code>APE_TASK_ID</code>, <code>APE_REPO_PATH</code>.</td></tr>
+      <tr><td><code>PIPE_PORT</code></td><td>no</td><td>Listen port (default <code>8181</code>).</td></tr>
+      <tr><td><code>PIPE_HOST</code></td><td>no</td><td>Bind address (default <code>127.0.0.1</code>; <code>0.0.0.0</code> accepts remote calls).</td></tr>
+      <tr><td><code>PIPE_WORKSPACE</code></td><td>no</td><td>A label attached to forwarded tasks (default <code>default</code>).</td></tr>
+      <tr><td class="grp" colspan="3">In your app's backend</td></tr>
+      <tr><td><code>PIPE_API_KEY</code></td><td>yes</td><td>The same secret, sent as the Bearer token. Backend only — never in a browser.</td></tr>
     </table>
-    <div class="note warn"><strong>The GitHub token never goes in your app.</strong> It lives only in Supabase's
-      secrets and on your machine. The browser only ever holds the public Project URL and anon key.</div>
-  </section>
-
-  <!-- OTHER STACKS -->
-  <section id="app">
-    <span class="tag">Optional</span>
-    <h2>Your app, in another stack</h2>
-    <p class="lead">The app step above uses plain JavaScript. Here is the same insert for a few other setups —
-      they all do one thing: save a row.</p>
-    <div class="tabs" id="tabs"></div>
-    <div class="code"><button class="copy">Copy</button><pre id="snippet"></pre></div>
+    <div class="note warn"><strong>Calling the pipe from another machine?</strong> Set <code>PIPE_HOST=0.0.0.0</code> and put it
+      behind HTTPS (Caddy, nginx, or a tunnel), because the key and feedback otherwise travel in cleartext. The pipe itself
+      never changes — you are only adding transport in front of it.</div>
   </section>
 
 </main>
 
 <footer>
   <div class="wrap">
-    Feedback Agent — open source ·
+    Feedback Pipe — open source ·
     <a href="https://github.com/Jakobyht/feedback-pipe" target="_blank" rel="noopener">github.com/Jakobyht/feedback-pipe</a>
   </div>
 </footer>
@@ -414,39 +353,47 @@ document.querySelectorAll('.code .copy').forEach(function(btn){
 });
 
 var snippets = {
-  "Supabase (browser)": `import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  "https://YOUR_PROJECT_REF.supabase.co", // Project URL
-  "YOUR_ANON_KEY"                         // anon public key
-);
-
-async function sendFeedback(feedbackMessage, user) {
-  const { error } = await supabase.from("feedback").insert({
-    message: feedbackMessage,
-    page_url: window.location.pathname,
-    user_email: user?.email ?? null
+  "Node.js (backend)": `// Node 18+ has fetch built in.
+export async function sendFeedback(message, pageUrl) {
+  const res = await fetch("http://localhost:8181/feedback", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: \`Bearer \${process.env.PIPE_API_KEY}\`
+    },
+    body: JSON.stringify({ message, pageUrl })
   });
-  if (error) throw error;
+  if (!res.ok) throw new Error(\`pipe returned \${res.status}\`);
 }`,
-  "Next.js (route)": `// app/api/feedback/route.ts
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
+  "Next.js (route)": `// app/api/feedback/route.ts — your browser code calls THIS,
+// and this route calls the pipe. The key stays on the server.
 export async function POST(req: Request) {
-  const { message, pageUrl, userEmail } = await req.json();
-  const { error } = await supabase.from("feedback").insert({
-    message, page_url: pageUrl, user_email: userEmail ?? null
+  const { message, pageUrl } = await req.json();
+  const res = await fetch(process.env.PIPE_URL + "/feedback", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: \`Bearer \${process.env.PIPE_API_KEY}\`
+    },
+    body: JSON.stringify({ message, pageUrl })
   });
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (!res.ok) return Response.json({ error: "pipe error" }, { status: 502 });
   return Response.json({ ok: true });
 }`,
-  "SQL (test)": `insert into public.feedback (message, page_url, user_email)
-values ('The checkout button does nothing on mobile', '/cart', 'test@example.com');`
+  "Python": `import os
+import requests
+
+def send_feedback(message, page_url=None):
+    requests.post(
+        "http://localhost:8181/feedback",
+        headers={"Authorization": f"Bearer {os.environ['PIPE_API_KEY']}"},
+        json={"message": message, "pageUrl": page_url},
+        timeout=5,
+    ).raise_for_status()`,
+  "curl (test)": `curl -sS http://localhost:8181/feedback \\
+  -H "authorization: Bearer $PIPE_API_KEY" \\
+  -H 'content-type: application/json' \\
+  -d '{"message":"The checkout button does nothing on mobile","pageUrl":"/cart"}'`
 };
 
 var tabsEl = document.getElementById('tabs');
