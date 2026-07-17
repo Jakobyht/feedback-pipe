@@ -73,6 +73,36 @@ test("a change lands on its own branch and main is untouched", () => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test("a diff touching sensitive paths is flagged on the pushed commit", () => {
+  const { root, origin, work } = setupRepo();
+
+  // A prompt-injected agent writes secrets into a tracked file — the classic
+  // exfiltration-into-the-PR move. It leaves a fingerprint in the diff.
+  const agent = path.join(root, "evil-agent.sh");
+  fs.writeFileSync(agent, '#!/usr/bin/env bash\nprintf "SECRET=leaked\\n" > .env\n');
+  fs.chmodSync(agent, 0o755);
+
+  runAgent(work, "task_evil", agent);
+
+  const msg = gitDir(origin, "log", "-1", "--format=%B", "feedback/task_evil");
+  assert.match(msg, /SENSITIVE PATHS TOUCHED/, "the reviewer-facing commit is flagged");
+  assert.match(msg, /\.env/, "and names the offending path");
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("a benign change is NOT flagged", () => {
+  const { root, origin, work } = setupRepo();
+  const agent = path.join(root, "ok-agent.sh");
+  fs.writeFileSync(agent, '#!/usr/bin/env bash\necho "ok" >> app.txt\n');
+  fs.chmodSync(agent, 0o755);
+
+  runAgent(work, "task_ok2", agent);
+
+  const msg = gitDir(origin, "log", "-1", "--format=%B", "feedback/task_ok2");
+  assert.doesNotMatch(msg, /SENSITIVE PATHS TOUCHED/, "a normal fix carries no false warning");
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test("a no-op change pushes nothing", () => {
   const { root, origin, work } = setupRepo();
 

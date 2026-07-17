@@ -33,6 +33,27 @@ claude login        # OAuth / Claude subscription — no ANTHROPIC_API_KEY neede
 Either way, the model credential lives with the agent, never in the pipe's
 config — the pipe only holds `PIPE_API_KEY` (its inbound key) and `PIPE_REPO`.
 
+## Security: contain the agent run (least privilege)
+
+Review-before-merge protects the **default branch** — the agent's output lands
+as a PR a human approves. It does **not** protect the **machine** during the
+run: feedback is untrusted, and a prompt-injected agent executes with whatever
+this process can reach. Two layers already help — the prompt is fenced and
+labeled untrusted (`packages/shared` `buildAgentPrompt`), and `review-agent.sh`
+flags any diff that touches sensitive paths (`.env`, keys, `.github/workflows/`,
+…) so a reviewer can't skim past it — but neither contains the run itself.
+So run the pipe host as least-privilege:
+
+- **A restricted user in a sandbox/container.** Not your dev login.
+- **No production secrets in the agent's environment.** If `.env`/cloud creds
+  aren't reachable, they can't be exfiltrated into a PR.
+- **Scoped push credentials.** A deploy key that can push branches to *this*
+  repo only — never a personal token with org-wide or write-to-main rights.
+- **No inbound access to your infra** from the host beyond what the agent needs.
+
+The fencing and the sensitive-path tripwire lower the odds and the blast radius;
+this containment is what bounds the worst case.
+
 ## Keep it running (systemd)
 
 [`feedback-pipe.service`](./feedback-pipe.service) restarts the pipe on crash
