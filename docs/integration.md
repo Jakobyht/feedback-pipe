@@ -2,8 +2,10 @@
 
 How to install the pipe, run it, and send feedback to it from your own app.
 
-The pipe is one-directional: your app sends a feedback message; the pipe forwards
-it to your coding agent and is done. There is no response to wait for.
+The pipe is one-directional: your app sends a feedback message; the pipe hands
+it to your coding agent and is done. There is no result to wait for. Tasks are
+queued and the agent runs on them one at a time, because two agents editing the
+same checkout would corrupt each other's work.
 
 ---
 
@@ -74,7 +76,8 @@ One endpoint. Send a `POST` with your key and a JSON body.
 ```
 
 - **Response:** `202 { "taskId": "...", "status": "forwarded" }`
-- `401` if the key is wrong, `400` for invalid JSON, `422` if `message` is missing.
+- `401` if the key is wrong, `400` for invalid JSON, `422` if `message` is
+  missing, `413` if the body exceeds 256 KB.
 
 ---
 
@@ -254,4 +257,7 @@ To accept calls from your app elsewhere:
 3. Point your app's URL at the proxy (e.g. `https://pipe.example.com/feedback`).
 
 The `PIPE_API_KEY` is the only thing guarding the endpoint, so keep it secret and
-make it long and random.
+make it long and random. Remember what it grants: feedback goes verbatim to an
+agent that can edit the repository, so whoever holds the key effectively has
+write access to the codebase. Treat it like a deploy key, and review what the
+agent produces (e.g. via pull requests) rather than trusting the input.
