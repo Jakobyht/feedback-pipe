@@ -1,8 +1,16 @@
 # Feedback Pipe
 
-A single local program that forwards user feedback to an entity's **own** coding
-agent (e.g. Claude Code). It has no model and makes no judgement about the code —
-it is the wire, not the worker.
+Forward user feedback to an entity's **own** coding agent (e.g. Claude Code).
+There are two ways to run it — pick one:
+
+- **GitHub-native (no server to run).** Feedback becomes a GitHub issue; a
+  GitHub Action wakes Claude over OAuth; a **deterministic gate** lets it open a
+  PR only for a *verified bug*. Nothing is always-on except GitHub. This is the
+  recommended flow for most apps → **[docs/github-native.md](docs/github-native.md)**.
+- **Local HTTP pipe.** A single local program you host that hands feedback to an
+  agent running on a machine you control. Described below.
+
+The rest of this README covers the local HTTP pipe.
 
 ```
 feedback (HTTP, authenticated)  ->  pipe  ->  runs the entity's agent in the repo
