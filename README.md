@@ -102,7 +102,10 @@ PIPE_AGENT_COMMAND=/absolute/path/to/examples/agents/review-agent.sh
 It runs each task on its own branch and opens a **draft pull request** a human
 approves — the default branch is never changed automatically
 ([examples/agents/review-agent.sh](examples/agents/review-agent.sh), tested by
-`examples/agents/review-agent.test.js`).
+`examples/agents/review-agent.test.js`). For how to make that agent's output
+*correct* as well as reviewable — verification gates, honest failure, and
+letting required CI checks be the real merge gate — see
+[docs/agent-side.md](docs/agent-side.md).
 
 **Agent auth is OAuth, not a key in the pipe.** The agent inherits the pipe's
 environment, so run `claude login` (OAuth / subscription) once on the host and
